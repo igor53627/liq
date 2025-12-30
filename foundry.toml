@@ -1,0 +1,11 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+ffi = true
+
+# Huff source
+fs_permissions = [{ access = "read", path = "./" }]
+
+[profile.default.fuzz]
+runs = 256

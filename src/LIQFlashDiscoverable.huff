@@ -1,0 +1,161 @@
+/// @title LIQFlashDiscoverable - Discoverable Flash Mint
+/// @notice Adds ERC-165 + FlashLoan event for bot discovery
+/// @dev ERC-3156 FlashLender interface ID: 0x2f0a18c5
+
+// ============ CONSTANTS ============
+
+#define constant CALLBACK_SUCCESS = 0x439148f0bbc682ca079e46d6e2c2f0c1e3b820f1a291b069d8882abf8cf18dd9
+
+// ERC-165 interface IDs
+#define constant ERC165_INTERFACE_ID = 0x01ffc9a7
+#define constant ERC3156_LENDER_INTERFACE_ID = 0x2f0a18c5
+
+// Function selectors
+#define constant SUPPORTS_INTERFACE_SIG = 0x01ffc9a7  // supportsInterface(bytes4)
+#define constant FLASH_LOAN_SIG = 0x5cffe9de
+#define constant MAX_FLASH_LOAN_SIG = 0x613255ab
+#define constant FLASH_FEE_SIG = 0xd9d98ce4
+
+// Event: FlashLoan(address indexed receiver, address indexed token, uint256 amount)
+// Topic0 = keccak256("FlashLoan(address,address,uint256)")
+#define constant FLASH_LOAN_EVENT = 0xc76f1b4fe4396ac07a9fa55a415d4ca430e72651d37d3401f3bed7cb13fc4f12
+
+// ============ MAIN ============
+
+#define macro MAIN() = takes(0) returns(0) {
+    0x00 calldataload 0xe0 shr
+    
+    dup1 [FLASH_LOAN_SIG] eq flash jumpi
+    dup1 [SUPPORTS_INTERFACE_SIG] eq supports jumpi
+    dup1 [MAX_FLASH_LOAN_SIG] eq max jumpi
+    [FLASH_FEE_SIG] eq fee jumpi
+    
+    0x00 0x00 revert
+
+    flash:
+        pop FLASH_LOAN()
+    
+    supports:
+        pop SUPPORTS_INTERFACE()
+    
+    max:
+        pop MAX_FLASH_LOAN()
+    
+    fee:
+        FLASH_FEE()
+}
+
+// ============ ERC-165: supportsInterface(bytes4) ============
+
+#define macro SUPPORTS_INTERFACE() = takes(0) returns(0) {
+    // Load interfaceId from calldata (first 4 bytes of the bytes4 param)
+    0x04 calldataload 0xe0 shr      // [interfaceId]
+    
+    // Check ERC-165
+    dup1 [ERC165_INTERFACE_ID] eq
+    ret_true jumpi
+    
+    // Check ERC-3156 FlashLender
+    [ERC3156_LENDER_INTERFACE_ID] eq
+    ret_true jumpi
+    
+    // Return false
+    0x00 0x00 mstore
+    0x20 0x00 return
+    
+    ret_true:
+        0x01 0x00 mstore
+        0x20 0x00 return
+}
+
+// ============ maxFlashLoan ============
+
+#define macro MAX_FLASH_LOAN() = takes(0) returns(0) {
+    0x04 calldataload address eq
+    iszero ret_zero jumpi
+    
+    0x00 not 0x00 mstore
+    0x20 0x00 return
+    
+    ret_zero:
+        0x00 0x00 mstore
+        0x20 0x00 return
+}
+
+// ============ flashFee ============
+
+#define macro FLASH_FEE() = takes(0) returns(0) {
+    0x04 calldataload address eq
+    iszero fee_bad jumpi
+    
+    0x00 0x00 mstore
+    0x20 0x00 return
+    
+    fee_bad:
+        0x00 0x00 revert
+}
+
+// ============ flashLoan with Event ============
+
+#define macro FLASH_LOAN() = takes(0) returns(0) {
+    // Validate token
+    0x24 calldataload address eq
+    iszero bad jumpi
+    
+    // === Emit FlashLoan event FIRST (for indexing) ===
+    // event FlashLoan(address indexed receiver, address indexed token, uint256 amount)
+    // log3(offset, size, topic0, topic1, topic2)
+    
+    0x44 calldataload           // [amount]
+    0x00 mstore                 // store amount at 0x00
+    
+    address                     // [token] - topic2
+    0x04 calldataload           // [receiver, token] - topic1
+    [FLASH_LOAN_EVENT]          // [topic0, receiver, token]
+    0x20 0x00                   // [offset, size, topic0, receiver, token]
+    log3                        // []
+    
+    // === Build calldata at 0x80 ===
+    0x23e30c8b00000000000000000000000000000000000000000000000000000000
+    0x80 mstore
+    
+    caller 0x84 mstore
+    address 0xa4 mstore
+    0x44 calldataload 0xc4 mstore
+    0x00 0xe4 mstore
+    0xa0 0x104 mstore
+    
+    // Data handling
+    0x64 calldataload 0x04 add
+    dup1 calldataload
+    dup1 0x124 mstore
+    
+    swap1 0x20 add
+    0x144
+    calldatacopy
+    
+    // Call size
+    0x64 calldataload 0x04 add calldataload
+    0xc4 add
+    
+    // CALL
+    0x20 0x00
+    dup3 0x80 0x00
+    0x04 calldataload
+    gas call
+    
+    iszero bad jumpi
+    pop
+    
+    // Verify callback
+    0x00 mload
+    [CALLBACK_SUCCESS] eq
+    iszero bad jumpi
+    
+    // Return true
+    0x01 0x00 mstore
+    0x20 0x00 return
+    
+    bad:
+        0x00 0x00 revert
+}

@@ -1,0 +1,86 @@
+/// @title LIQFlashV4 - Maximum micro-optimizations
+/// @notice Key opts: shared revert label, inlined view funcs, tighter stack
+
+#define constant CALLBACK_SUCCESS = 0x439148f0bbc682ca079e46d6e2c2f0c1e3b820f1a291b069d8882abf8cf18dd9
+
+#define macro MAIN() = takes(0) returns(0) {
+    0x00 calldataload 0xe0 shr
+    
+    dup1 0x5cffe9de eq flash jumpi
+    dup1 0x613255ab eq max jumpi
+    0xd9d98ce4 eq fee jumpi
+    
+    bad:
+    0x00 0x00 revert
+
+    flash:
+        pop FLASH_LOAN_V4()
+    
+    max:
+        pop
+        0x04 calldataload address eq
+        ret_max jumpi
+        0x00 0x00 mstore
+        0x20 0x00 return
+        ret_max:
+        0x00 not 0x00 mstore
+        0x20 0x00 return
+    
+    fee:
+        0x04 calldataload address eq
+        iszero bad jumpi
+        0x00 0x00 mstore
+        0x20 0x00 return
+}
+
+#define macro FLASH_LOAN_V4() = takes(0) returns(0) {
+    // Validate token
+    0x24 calldataload address eq
+    iszero bad jumpi
+    
+    // Build calldata at 0x80
+    0x23e30c8b00000000000000000000000000000000000000000000000000000000
+    0x80 mstore
+    
+    caller 0x84 mstore
+    address 0xa4 mstore
+    0x44 calldataload 0xc4 mstore
+    0x00 0xe4 mstore
+    0xa0 0x104 mstore
+    
+    // Data handling - optimized
+    0x64 calldataload 0x04 add  // [ptr]
+    dup1 calldataload           // [len, ptr]
+    dup1 0x124 mstore           // [len, ptr]
+    
+    // calldatacopy args: dest, src, len
+    swap1 0x20 add              // [src, len]
+    0x144 swap2                 // [len, 0x144, src]
+    swap1 swap2                 // [0x144, src, len]
+    calldatacopy                // []
+    
+    // call_size
+    0x64 calldataload 0x04 add calldataload
+    0xc4 add                    // [size]
+    
+    // CALL - optimized ordering
+    0x20 0x00                   // [retOff, retSize, size]
+    dup3                        // [size, retOff, retSize, size]
+    0x80 0x00                   // [value, argsOff, size, retOff, retSize, size]
+    0x04 calldataload           // [receiver, value, argsOff, size, retOff, retSize, size]
+    gas call                    // [success, size]
+    
+    iszero bad jumpi
+    pop
+    
+    // Check return
+    0x00 mload
+    [CALLBACK_SUCCESS] eq
+    iszero bad jumpi
+    
+    0x01 0x00 mstore
+    0x20 0x00 return
+    
+    bad:
+        0x00 0x00 revert
+}

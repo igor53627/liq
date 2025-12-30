@@ -1,0 +1,129 @@
+/// @title LIQFlashV3 - Maximum optimization flash mint
+/// @notice Target: sub-5000 warm gas
+/// @dev Key: use memory 0x00 for calldata, 0xe0 for return
+
+#define constant CALLBACK_SUCCESS = 0x439148f0bbc682ca079e46d6e2c2f0c1e3b820f1a291b069d8882abf8cf18dd9
+
+// ============ MAIN ============
+
+#define macro MAIN() = takes(0) returns(0) {
+    0x00 calldataload 0xe0 shr
+    
+    dup1 0x5cffe9de eq flash jumpi
+    dup1 0x613255ab eq max jumpi
+    0xd9d98ce4 eq fee jumpi
+    
+    0x00 0x00 revert
+
+    flash:
+        pop FLASH_LOAN_OPT()
+    
+    max:
+        pop MAX_FLASH_LOAN_OPT()
+    
+    fee:
+        FLASH_FEE_OPT()
+}
+
+#define macro MAX_FLASH_LOAN_OPT() = takes(0) returns(0) {
+    0x04 calldataload address eq
+    is_max jumpi
+    0x00 0x00 mstore
+    0x20 0x00 return
+    
+    is_max:
+        0x00 not 0x00 mstore
+        0x20 0x00 return
+}
+
+#define macro FLASH_FEE_OPT() = takes(0) returns(0) {
+    0x04 calldataload address eq
+    fee_ok jumpi
+    0x00 0x00 revert
+    
+    fee_ok:
+        0x00 0x00 mstore
+        0x20 0x00 return
+}
+
+#define macro FLASH_LOAN_OPT() = takes(0) returns(0) {
+    // Validate token
+    0x24 calldataload address eq
+    iszero bad jumpi
+    
+    // Build onFlashLoan calldata at 0x00
+    // Selector (left-aligned)
+    0x23e30c8b00000000000000000000000000000000000000000000000000000000
+    0x00 mstore
+    
+    // initiator = caller at 0x04
+    caller 0x04 mstore
+    
+    // token = this at 0x24
+    address 0x24 mstore
+    
+    // amount at 0x44
+    0x44 calldataload 0x44 mstore
+    
+    // fee = 0 at 0x64
+    0x00 0x64 mstore
+    
+    // data offset at 0x84 (0xa0 = 160 bytes from params start at 0x04)
+    0xa0 0x84 mstore
+    
+    // Get data info from calldata
+    // bytes is at offset 0x64, which points to length, then data
+    0x64 calldataload           // [data_offset_in_calldata]
+    0x04 add                    // [ptr_to_length]
+    dup1 calldataload           // [data_len, ptr_to_length]
+    
+    // Store length at 0xa4
+    dup1 0xa4 mstore            // [data_len, ptr_to_length]
+    
+    // Calculate data start in calldata
+    swap1 0x20 add              // [data_start_in_calldata, data_len]
+    
+    // calldatacopy(destOffset, offset, size)
+    // Stack needs: [size, offset, destOffset] (top to bottom)
+    swap1                       // [data_len, data_start]
+    0xc4 swap2                  // [data_start, data_len, 0xc4]
+    swap2                       // [0xc4, data_len, data_start]
+    swap1                       // [data_len, 0xc4, data_start]
+    swap2                       // [data_start, 0xc4, data_len]
+    swap1                       // [0xc4, data_start, data_len]
+    calldatacopy                // []
+    
+    // Get data_len again for call size
+    0x64 calldataload 0x04 add calldataload  // [data_len]
+    0xa4 add                    // [callSize]
+    
+    // CALL: call(gas, addr, value, argsOffset, argsSize, retOffset, retSize)
+    // Build from top of stack down
+    0x20                        // [retSize, callSize]
+    0xe0                        // [retOffset, retSize, callSize]
+    dup3                        // [argsSize, retOffset, retSize, callSize]
+    0x00                        // [argsOffset, argsSize, retOffset, retSize, callSize]
+    0x00                        // [value, argsOffset, argsSize, retOffset, retSize, callSize]
+    0x04 calldataload           // [receiver, value, argsOffset, argsSize, retOffset, retSize, callSize]
+    gas                         // [gas, receiver, value, argsOffset, argsSize, retOffset, retSize, callSize]
+    call                        // [success, callSize]
+    
+    iszero call_bad jumpi
+    pop                         // []
+    
+    // Verify callback returned CALLBACK_SUCCESS
+    0xe0 mload                  // [ret]
+    [CALLBACK_SUCCESS] eq
+    iszero cb_bad jumpi
+    
+    // Return true
+    0x01 0x00 mstore
+    0x20 0x00 return
+    
+    bad:
+        0x00 0x00 revert
+    call_bad:
+        0x00 0x00 revert
+    cb_bad:
+        0x00 0x00 revert
+}

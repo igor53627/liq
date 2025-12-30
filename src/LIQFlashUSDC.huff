@@ -1,0 +1,248 @@
+/// @title LIQFlashUSDC - Real USDC Flash Loans with Scaled ETH Fee
+/// @notice Optimistic transfer pattern: transfer → callback → verify balance
+/// @notice Fee scales 0→$1 based on gas price (0-20 gwei range)
+
+// ============ Constants ============
+
+#define constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
+#define constant CALLBACK_SUCCESS = 0x439148f0bbc682ca079e46d6e2c2f0c1e3b820f1a291b069d8882abf8cf18dd9
+
+// Fee scaling: 0 below 5 gwei, linear to MAX_FEE at 20 gwei
+#define constant MIN_GAS_PRICE = 0x12A05F200       // 5 gwei in wei
+#define constant GAS_RANGE = 0x37E11D600          // 15 gwei range (5→20)
+#define constant MAX_FEE_WEI = 0x12F2A36ECD555    // ~$1 in ETH at $3k (0.000333 ETH)
+
+// Storage
+#define constant OWNER_SLOT = 0x00
+#define constant TREASURY_SLOT = 0x01
+
+// ERC20 selectors
+#define constant TRANSFER_SIG = 0xa9059cbb00000000000000000000000000000000000000000000000000000000
+#define constant BALANCE_OF_SIG = 0x70a0823100000000000000000000000000000000000000000000000000000000
+
+// ============ Main Dispatcher ============
+
+#define macro MAIN() = takes(0) returns(0) {
+    0x00 calldataload 0xe0 shr
+    
+    dup1 0x5cffe9de eq flash_loan jumpi      // flashLoan(address,address,uint256,bytes)
+    dup1 0x613255ab eq max_flash_loan jumpi  // maxFlashLoan(address)
+    dup1 0xd9d98ce4 eq flash_fee jumpi       // flashFee(address,uint256)
+    dup1 0x3ccfd60b eq withdraw jumpi        // withdraw()
+    0xf0f44260 eq set_treasury jumpi         // setTreasury(address)
+    
+    0x00 0x00 revert
+    
+    // ============ flashLoan ============
+    // NOTE: Use memory starting at 0x80 to avoid Foundry fork-mode issues with 0x00-0x40
+    flash_loan:
+        pop
+        
+        // Verify token is USDC
+        0x24 calldataload [USDC] eq iszero revert_bad_token jumpi
+        
+        // Get initial USDC balance
+        // balanceOf calldata: selector (4 bytes) + address (32 bytes padded) = 36 bytes
+        // Memory: mstore(0x100, sel), mstore(0x104, addr) - overlapping stores
+        // staticcall(gas, usdc, argsOffset=0x100, argsSize=0x24, retOffset=0x100, retSize=0x20)
+        [BALANCE_OF_SIG] 0x100 mstore
+        address 0x104 mstore
+        0x20 0x100 0x24 0x100 [USDC] gas staticcall
+        iszero revert_now jumpi
+        0x100 mload                          // [initial_balance]
+        
+        // Get loan amount
+        0x44 calldataload                    // [amount, initial_balance]
+        
+        // Transfer USDC to receiver (optimistic)
+        // transfer calldata: selector (4) + to (32) + amount (32) = 68 bytes
+        // Memory: 0x100 = selector, 0x104 = to, 0x124 = amount
+        [TRANSFER_SIG] 0x100 mstore
+        0x04 calldataload 0x104 mstore        // receiver
+        dup1 0x124 mstore                     // amount
+        0x20 0x100 0x44 0x100 [USDC] gas call
+        iszero revert_now jumpi
+        
+        // Calculate fee (scaled by gas price)
+        CALC_FEE()                           // [fee_wei, amount, initial_balance]
+        
+        // Build callback: onFlashLoan(initiator, token, amount, fee, data)
+        // Memory layout at 0x200: selector(4+28), initiator(32), token(32), amount(32), fee(32), data_offset(32), data
+        // Total header = 4 + 5*32 = 164 bytes = 0xa4
+        0x23e30c8b 0xe0 shl 0x200 mstore     // selector at 0x200
+        caller 0x204 mstore                   // initiator = msg.sender
+        [USDC] 0x224 mstore                  // token
+        dup2 0x244 mstore                    // amount (from stack)
+        dup1 0x264 mstore                    // fee (from stack)
+        0xa0 0x284 mstore                    // data offset (0xa0 = 160, points to data length relative to selector)
+        
+        // Copy data from calldata
+        // bytes param: at 0x64 there's an offset (relative to 0x04), pointing to length + data
+        0x64 calldataload 0x04 add           // [data_abs_offset] = offset + 4 (skip selector)
+        dup1 calldataload                    // [data_len, data_abs_offset]
+        dup1 0x2a4 mstore                    // store length at memory 0x2a4
+        // calldatacopy(destOffset, offset, length) - stack order: [destOffset, offset, length]
+        swap1 0x20 add                       // [data_abs_offset+32, data_len]
+        0x2c4                                // [0x2c4, data_abs_offset+32, data_len]
+        calldatacopy                         // copy data bytes to memory starting at 0x2c4
+        
+        // Calculate total calldata size
+        0x64 calldataload 0x04 add calldataload  // data_len
+        0xc4 add                             // 0xc4 + data_len = total size
+        
+        // Call receiver.onFlashLoan(...)
+        // Return data goes to 0x100 (safe area we use for ERC20 calls)
+        0x20                                 // ret size
+        0x100                                // ret offset
+        dup3                                 // calldata size
+        0x200                                // calldata offset
+        0x00                                 // value
+        0x04 calldataload                    // receiver
+        gas call
+        iszero revert_now jumpi
+        pop                                  // clean up size from stack
+        
+        // Verify callback returned success
+        0x100 mload [CALLBACK_SUCCESS] eq iszero revert_callback jumpi
+        
+        // [fee_wei, amount, initial_balance] still on stack
+        
+        // Get final USDC balance (reuse memory at 0x100)
+        [BALANCE_OF_SIG] 0x100 mstore
+        address 0x104 mstore
+        0x20 0x100 0x24 0x100 [USDC] gas staticcall
+        iszero revert_now jumpi
+        0x100 mload                          // [final_balance, fee_wei, amount, initial_balance]
+        
+        // Verify: final_balance >= initial_balance
+        swap1 swap2 swap3                    // [initial_balance, final_balance, fee_wei, amount]
+        dup2 lt revert_not_repaid jumpi      // revert if final < initial
+        pop pop                              // [fee_wei, final_balance - but we don't need final]
+        
+        // Collect ETH fee (already calculated, on stack)
+        // Fee is in wei, must have been sent with call
+        swap1 pop                            // [fee_wei]
+        dup1 callvalue lt revert_fee jumpi   // revert if msg.value < fee
+        
+        // Send fee to treasury
+        [TREASURY_SLOT] sload                // [treasury, fee_wei]
+        swap1                                // [fee_wei, treasury]
+        0x00 0x00 0x00 0x00                  // ret params
+        dup5                                 // value = fee_wei
+        dup6                                 // to = treasury
+        gas call pop                         // send fee, ignore result
+        
+        // Refund excess ETH to caller
+        callvalue swap1 sub                  // [refund = callvalue - fee]
+        dup1 iszero skip_refund jumpi
+        0x00 0x00 0x00 0x00                  // ret params
+        dup5                                 // value = refund
+        caller                               // to = caller
+        gas call pop
+        skip_refund:
+        pop
+        
+        // Return success
+        0x01 0x100 mstore
+        0x20 0x100 return
+    
+    // ============ maxFlashLoan ============
+    max_flash_loan:
+        pop
+        0x04 calldataload [USDC] eq iszero ret_zero jumpi
+        
+        // Return USDC balance
+        [BALANCE_OF_SIG] 0x100 mstore
+        address 0x104 mstore
+        0x20 0x100 0x24 0x100 [USDC] gas staticcall
+        iszero ret_zero jumpi
+        0x20 0x100 return
+        
+        ret_zero:
+        0x00 0x100 mstore
+        0x20 0x100 return
+    
+    // ============ flashFee ============
+    flash_fee:
+        pop
+        0x04 calldataload [USDC] eq iszero revert_bad_token jumpi
+        CALC_FEE()
+        0x100 mstore
+        0x20 0x100 return
+    
+    // ============ withdraw (owner only) ============
+    withdraw:
+        pop
+        [OWNER_SLOT] sload origin eq iszero revert_now jumpi
+        
+        // Transfer all USDC to owner
+        [BALANCE_OF_SIG] 0x100 mstore
+        address 0x104 mstore
+        0x20 0x100 0x24 0x100 [USDC] gas staticcall
+        iszero revert_now jumpi
+        0x100 mload                          // balance
+        
+        [TRANSFER_SIG] 0x100 mstore
+        caller 0x104 mstore
+        0x124 mstore                          // amount = balance
+        0x20 0x100 0x44 0x100 [USDC] gas call
+        iszero revert_now jumpi
+        stop
+    
+    // ============ setTreasury ============
+    set_treasury:
+        [OWNER_SLOT] sload origin eq iszero revert_now jumpi
+        0x04 calldataload [TREASURY_SLOT] sstore
+        stop
+    
+    // ============ Error handlers ============
+    revert_bad_token:
+        0x00 0x00 revert
+    revert_callback:
+        0x00 0x00 revert
+    revert_not_repaid:
+        0x00 0x00 revert
+    revert_fee:
+        0x00 0x00 revert
+    revert_now:
+        0x00 0x00 revert
+}
+
+/// @notice Calculate fee based on gas price
+/// @notice 0 below 5 gwei, linear to MAX_FEE at 20 gwei, capped above
+#define macro CALC_FEE() = takes(0) returns(1) {
+    gasprice                                 // [gas_price]
+    
+    // If below MIN_GAS_PRICE, fee = 0
+    // We need gp < MIN. LT: stack[0] < stack[1]. So need [gp, MIN] for gp < MIN.
+    // Stack: [gp]. Push MIN first, then dup gp on top.
+    [MIN_GAS_PRICE] dup2 lt calc_is_free jumpi
+    
+    // fee = (gas_price - MIN) * MAX_FEE / RANGE
+    // Stack: [gp]. We want gp - MIN.
+    // SUB: a - b where a=top, b=second. So we need [gp, MIN] -> sub -> gp - MIN.
+    [MIN_GAS_PRICE] swap1 sub                // [MIN, gp] -> swap -> [gp, MIN] -> sub -> gp - MIN
+    [MAX_FEE_WEI] mul                        // [delta * max_fee]
+    [GAS_RANGE] swap1 div                    // [RANGE, product] -> swap -> [product, RANGE] -> div -> product/RANGE
+    
+    // Cap at MAX_FEE: if fee > MAX, cap. GT checks stack[0] > stack[1].
+    // We need [fee, MAX] for fee > MAX check.
+    [MAX_FEE_WEI] dup2 gt calc_cap jumpi
+    calc_done jump
+    
+    calc_cap:
+        pop [MAX_FEE_WEI]
+        calc_done jump
+    
+    calc_is_free:
+        pop 0x00
+    
+    calc_done:
+        // [fee_wei] on stack
+}
+
+/// @notice Constructor - set owner (use origin for foundry-huff compatibility)
+#define macro CONSTRUCTOR() = takes(0) returns(0) {
+    origin [OWNER_SLOT] sstore
+    origin [TREASURY_SLOT] sstore
+}
