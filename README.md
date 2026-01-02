@@ -1,131 +1,152 @@
-# LIQ Flash Mint - Ultra Gas-Optimized ERC-3156 Flash Loans
+# LIQ Flash Loans
 
-## Overview
+**Zero-fee, gas-optimized USDC flash loans for arbitrage and liquidation bots.**
 
-LIQ is a **zero-fee, unlimited liquidity** flash mint implementation with the lowest gas costs in DeFi.
+## Gas Comparison
 
-| Provider | Warm Gas | Cold Gas | Fee |
-|----------|----------|----------|-----|
-| **LIQ (Huff)** | **5,166** | 9,666 | 0% |
-| LIQ (Yul) | 6,296 | 15,296 | 0% |
-| Euler | 18,570 | - | 0% |
-| Balancer | 28,500 | - | 0% |
+| Protocol | Warm Gas | Overhead |
+|----------|----------|----------|
+| Balancer | ~80,000 | ~28,000 |
+| Aave V3 | ~90,000 | ~38,000 |
+| **LIQ** | **40,736** | **~700** |
 
-**LIQ is 5.5x cheaper than Balancer and 3.6x cheaper than Euler.**
+LIQ is **~50% cheaper** than alternatives.
 
-## Key Innovation
+## Features
 
-Traditional flash loans require:
-1. SSTORE to mint tokens (+20,000 gas)
-2. SSTORE to burn tokens (+5,000 gas)
-
-LIQ's insight: **Flash minted tokens are virtual.** The borrower receives the `amount` in the callback arguments - no storage writes needed.
-
-## Bot Discovery
-
-### Method 1: ERC-165 Interface Detection
-
-```solidity
-interface IERC165 {
-    function supportsInterface(bytes4 interfaceId) external view returns (bool);
-}
-
-// ERC-3156 FlashLender interface ID
-bytes4 constant ERC3156_LENDER = 0x2f0a18c5;
-
-// Check if contract supports flash loans
-bool isFlashLender = IERC165(target).supportsInterface(ERC3156_LENDER);
-```
-
-### Method 2: Direct Query
-
-```solidity
-interface IERC3156FlashLender {
-    function maxFlashLoan(address token) external view returns (uint256);
-    function flashFee(address token, uint256 amount) external view returns (uint256);
-}
-
-// Query capabilities
-uint256 maxAmount = liq.maxFlashLoan(address(liq)); // Returns type(uint256).max
-uint256 fee = liq.flashFee(address(liq), 1e18);      // Returns 0
-```
-
-### Method 3: Event Indexing
-
-```solidity
-event FlashLoan(address indexed receiver, address indexed token, uint256 amount);
-// Topic0: 0xc76f1b4fe4396ac07a9fa55a415d4ca430e72651d37d3401f3bed7cb13fc4f12
-```
-
-Index this event to track flash loan usage and discover active LIQ deployments.
+- **Zero fees** - Bots keep 100% of profits
+- **ERC-3156 compatible** - Works with existing flash loan code
+- **Pure Yul** - Maximum gas optimization
+- **Single token** - USDC only (simplicity = efficiency)
 
 ## Usage
 
-```solidity
-import "IERC3156FlashBorrower.sol";
+### For Bots
 
-contract Arbitrageur is IERC3156FlashBorrower {
-    bytes32 constant CALLBACK_SUCCESS = keccak256("ERC3156FlashBorrower.onFlashLoan");
-    
-    function executeArbitrage(address liq, uint256 amount) external {
-        IERC3156FlashLender(liq).flashLoan(
-            address(this),  // receiver
-            liq,            // token (LIQ itself)
-            amount,         // any amount up to uint256.max
-            abi.encode(arbitrageParams)
-        );
-    }
-    
+```solidity
+interface IERC3156FlashBorrower {
     function onFlashLoan(
         address initiator,
         address token,
         uint256 amount,
-        uint256 fee,      // Always 0 for LIQ
+        uint256 fee,
         bytes calldata data
+    ) external returns (bytes32);
+}
+
+contract MyBot is IERC3156FlashBorrower {
+    bytes32 constant CALLBACK_SUCCESS = keccak256("ERC3156FlashBorrower.onFlashLoan");
+    
+    function executeArbitrage(address lender, uint256 amount) external {
+        IFlashLender(lender).flashLoan(address(this), USDC, amount, "");
+    }
+    
+    function onFlashLoan(
+        address,
+        address token,
+        uint256 amount,
+        uint256,  // fee is always 0
+        bytes calldata
     ) external returns (bytes32) {
-        // NOTE: You don't have `amount` tokens in your balance!
-        // The `amount` is passed as an argument for your arbitrage logic.
-        
-        // Execute your arbitrage here...
-        
+        // 1. Do arbitrage/liquidation here
+        // 2. Repay
+        IERC20(token).transfer(msg.sender, amount);
         return CALLBACK_SUCCESS;
     }
 }
 ```
 
-## Important: Virtual Token Model
+### Contract Interface
 
-LIQ flash mints are **virtual** - tokens are not actually minted to your balance. The `amount` is provided as a callback argument for your calculations. This enables:
-
-1. **Unlimited liquidity**: Borrow any amount up to `uint256.max`
-2. **Zero storage cost**: No SSTORE operations
-3. **Lowest possible gas**: 5,166 gas warm
-
-## Contract Addresses
-
-| Network | Address | Verified |
-|---------|---------|----------|
-| Mainnet | TBD | - |
-| Sepolia | TBD | - |
-
-## Development
-
-```bash
-# Build
-forge build
-
-# Test
-forge test -vvv
-
-# Gas benchmarks
-forge test --match-test testSideBySide -vvv
+```solidity
+interface ILIQFlash {
+    /// @notice Execute flash loan
+    /// @param receiver Contract implementing IERC3156FlashBorrower
+    /// @param token Must be USDC
+    /// @param amount Amount to borrow
+    /// @param data Arbitrary data passed to callback
+    function flashLoan(address receiver, address token, uint256 amount, bytes calldata data) external returns (bool);
+    
+    /// @notice Get maximum available loan
+    function maxFlashLoan(address token) external view returns (uint256);
+    
+    /// @notice Get fee (always 0)
+    function flashFee(address token, uint256 amount) external view returns (uint256);
+    
+    /// @notice Deposit USDC (requires approval)
+    function deposit(uint256 amount) external;
+    
+    /// @notice Withdraw USDC (owner only)
+    function withdraw(uint256 amount) external;
+}
 ```
 
-## Files
+## Security Model
 
-- `src/LIQFlashV2.huff` - Optimized flash mint (5,166 gas)
-- `src/LIQFlashDiscoverable.huff` - With ERC-165 + events (7,000 gas)
-- `src/LIQYul.sol` - Yul reference implementation
+### How it works
+
+1. Borrow: USDC transferred to receiver (optimistic)
+2. Callback: `receiver.onFlashLoan(...)` called
+3. Verify: Contract checks `balanceOf(this) >= poolBalance`
+4. If balance is insufficient → revert (atomic, all-or-nothing)
+
+### Key Security Properties
+
+| Property | Implementation |
+|----------|---------------|
+| Repayment enforced | Balance check after callback |
+| Reentrancy safe | Balance check is atomic protection |
+| No callback check | Balance verification is sufficient |
+| Owner-only withdraw | Slot 0 check in Yul |
+
+### What's NOT checked
+
+- Callback return value (balance check is sufficient security)
+- Token parameter (always USDC)
+
+## Deployment
+
+```bash
+# Install dependencies
+forge install
+
+# Run tests (requires Tenderly RPC for mainnet fork)
+source ~/.zsh_secrets
+forge test --fork-url "$TENDERLY_VIRTUAL_TESTNET_RPC" --match-contract YulTest -vvv
+
+# Deploy
+forge create src/LIQFlashYul.sol:LIQFlashYul --rpc-url $RPC_URL --private-key $PRIVATE_KEY
+```
+
+## Storage Layout
+
+| Slot | Variable | Type |
+|------|----------|------|
+| 0 | owner | address |
+| 1 | poolBalance | uint256 |
+
+## Function Selectors
+
+| Function | Selector |
+|----------|----------|
+| flashLoan(address,address,uint256,bytes) | 0x5cffe9de |
+| maxFlashLoan(address) | 0x613255ab |
+| flashFee(address,uint256) | 0xd9d98ce4 |
+| deposit(uint256) | 0xb6b55f25 |
+| withdraw(uint256) | 0x2e1a7d4d |
+
+## Gas Breakdown
+
+Total warm gas: **40,736**
+
+| Component | Gas | Notes |
+|-----------|-----|-------|
+| USDC transfer out | ~29,000 | Proxy + implementation |
+| Callback + repay | ~7,000 | Borrower's transfer |
+| balanceOf check | ~2,500 | USDC call |
+| Protocol logic | ~700 | Dispatcher, storage, return |
+
+The ~40k is USDC's overhead - unavoidable without a different token.
 
 ## License
 
