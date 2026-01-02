@@ -19,28 +19,25 @@ contract LIQFlashYul {
             
             // flashLoan(address,address,uint256,bytes) = 0x5cffe9de
             if eq(sel, 0x5cffe9de) {
+                // Cache calldataload values
+                let receiver := calldataload(0x04)
+                let amount := calldataload(0x44)
+                
                 // Load poolBalance (expected balance) - slot 1
                 let expectedBal := sload(1)
                 
                 // Transfer USDC to receiver
                 mstore(0x00, 0xa9059cbb00000000000000000000000000000000000000000000000000000000)
-                mstore(0x04, calldataload(0x04))  // receiver
-                mstore(0x24, calldataload(0x44))  // amount
+                mstore(0x04, receiver)
+                mstore(0x24, amount)
                 if iszero(call(gas(), 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48, 0, 0x00, 0x44, 0x00, 0x20)) { revert(0, 0) }
                 
-                // Calculate fee inline
-                let fee := 0
-                if gt(gasprice(), 5000000000) {
-                    fee := div(mul(sub(gasprice(), 5000000000), 333333333333333), 15000000000)
-                    if gt(fee, 333333333333333) { fee := 333333333333333 }
-                }
-                
-                // Build callback: onFlashLoan(initiator, token, amount, fee, data)
+                // Build callback: onFlashLoan(initiator, token, amount, 0, data)
                 mstore(0x100, 0x23e30c8b00000000000000000000000000000000000000000000000000000000)
                 mstore(0x104, caller())           // initiator
                 mstore(0x124, 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48)  // token
-                mstore(0x144, calldataload(0x44)) // amount
-                mstore(0x164, fee)                // fee
+                mstore(0x144, amount)             // amount
+                mstore(0x164, 0)                  // fee = 0
                 mstore(0x184, 0xa0)               // data offset
                 
                 // Copy data
@@ -49,17 +46,14 @@ contract LIQFlashYul {
                 mstore(0x1a4, dataLen)
                 calldatacopy(0x1c4, add(dataOffset, 0x20), dataLen)
                 
-                // Call callback (ignore return value - balance check is sufficient)
-                if iszero(call(gas(), calldataload(0x04), 0, 0x100, add(0xc4, dataLen), 0x00, 0x20)) { revert(0, 0) }
+                // Call callback
+                if iszero(call(gas(), receiver, 0, 0x100, add(0xc4, dataLen), 0x00, 0x20)) { revert(0, 0) }
                 
-                // Check final balance - this is the real security check
+                // Check final balance
                 mstore(0x00, 0x70a0823100000000000000000000000000000000000000000000000000000000)
                 mstore(0x04, address())
                 if iszero(staticcall(gas(), 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48, 0x00, 0x24, 0x00, 0x20)) { revert(0, 0) }
                 if lt(mload(0x00), expectedBal) { revert(0, 0) }
-                
-                // Verify exact fee (fee stays in contract, no transfer needed)
-                if iszero(eq(callvalue(), fee)) { revert(0, 0) }
                 
                 // Return true
                 mstore(0x00, 1)
@@ -72,14 +66,9 @@ contract LIQFlashYul {
                 return(0x00, 0x20)
             }
             
-            // flashFee(address,uint256) = 0xd9d98ce4
+            // flashFee(address,uint256) = 0xd9d98ce4 - always 0
             if eq(sel, 0xd9d98ce4) {
-                let fee := 0
-                if gt(gasprice(), 5000000000) {
-                    fee := div(mul(sub(gasprice(), 5000000000), 333333333333333), 15000000000)
-                    if gt(fee, 333333333333333) { fee := 333333333333333 }
-                }
-                mstore(0x00, fee)
+                mstore(0x00, 0)
                 return(0x00, 0x20)
             }
             

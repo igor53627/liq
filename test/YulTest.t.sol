@@ -22,8 +22,8 @@ contract MockBorrower {
     bytes32 constant CALLBACK_SUCCESS = keccak256("ERC3156FlashBorrower.onFlashLoan");
     IERC20 constant USDC = IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
     
-    function borrow(address payable lender, uint256 amount) external payable {
-        ILIQFlashYul(lender).flashLoan{value: msg.value}(
+    function borrow(address payable lender, uint256 amount) external {
+        ILIQFlashYul(lender).flashLoan(
             address(this),
             address(USDC),
             amount,
@@ -64,36 +64,29 @@ contract YulTest is Test {
     }
     
     function testFlashLoan() public {
-        vm.txGasPrice(20 gwei);
-        
         uint256 amount = 10_000e6;
         uint256 fee = ILIQFlashYul(address(lender)).flashFee(address(USDC), amount);
-        console.log("Fee:", fee);
+        assertEq(fee, 0, "Fee should be 0");
         
-        vm.deal(address(borrower), fee);
-        borrower.borrow{value: fee}(payable(address(lender)), amount);
+        borrower.borrow(payable(address(lender)), amount);
         
-        console.log("[PASS] Flash loan completed");
+        console.log("[PASS] Flash loan completed (zero fee)");
     }
     
     function testGasBenchmark() public {
-        vm.txGasPrice(20 gwei);
-        
         uint256 amount = 10_000e6;
-        uint256 fee = ILIQFlashYul(address(lender)).flashFee(address(USDC), amount);
-        vm.deal(address(borrower), fee * 2);
         
         // First call (cold)
         uint256 gasBefore = gasleft();
-        borrower.borrow{value: fee}(payable(address(lender)), amount);
+        borrower.borrow(payable(address(lender)), amount);
         uint256 gasCold = gasBefore - gasleft();
         
         // Second call (warm)
         gasBefore = gasleft();
-        borrower.borrow{value: fee}(payable(address(lender)), amount);
+        borrower.borrow(payable(address(lender)), amount);
         uint256 gasWarm = gasBefore - gasleft();
         
-        console.log("=== YUL GAS BENCHMARK ===");
+        console.log("=== YUL GAS BENCHMARK (NO FEE) ===");
         console.log("Flash loan (cold):", gasCold);
         console.log("Flash loan (warm):", gasWarm);
     }
