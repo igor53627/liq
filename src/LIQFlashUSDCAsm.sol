@@ -11,7 +11,7 @@ contract LIQFlashUSDCAsm {
     uint256 constant MAX_FEE_WEI = 333333333333333; // ~$1 at $3k ETH
     
     address public owner;
-    address public treasury;
+    address public immutable treasury;  // Immutable saves SLOAD in hot path
     uint256 public poolBalance;
     
     event Deposit(address indexed from, uint256 amount);
@@ -23,9 +23,9 @@ contract LIQFlashUSDCAsm {
         _;
     }
     
-    constructor() {
+    constructor(address _treasury) {
         owner = msg.sender;
-        treasury = msg.sender;
+        treasury = _treasury;
     }
     
     /// @notice Deposit USDC into the pool (requires prior approval)
@@ -57,19 +57,16 @@ contract LIQFlashUSDCAsm {
         owner = newOwner;
     }
     
-    /// @notice Set treasury address for fee collection
-    function setTreasury(address _treasury) external onlyOwner {
-        treasury = _treasury;
-    }
+
     
     /// @notice Execute flash loan - HOT PATH, maximally optimized
+    /// @dev Only supports USDC. Token param kept for ERC-3156 compatibility but ignored.
     function flashLoan(
         address receiver,
-        address token,
+        address,  // token - ignored, always USDC
         uint256 amount,
         bytes calldata data
     ) external payable returns (bool) {
-        require(token == USDC, "!USDC");
         
         // Cache expected balance from storage (avoids ~7k gas balanceOf call)
         uint256 expectedBalance = poolBalance;
@@ -130,18 +127,15 @@ contract LIQFlashUSDCAsm {
         }
         
         require(finalBalance >= expectedBalance, "!repaid");
-        require(msg.value >= fee, "!fee");
+        require(msg.value == fee, "!fee");  // Exact fee required (no refunds)
         
-        // Use assembly call for ETH transfers (no 2300 gas stipend limit)
-        assembly {
-            if gt(fee, 0) {
-                let success := call(gas(), sload(treasury.slot), fee, 0, 0, 0, 0)
-                if iszero(success) { revert(0, 0) }
-            }
-            let refund := sub(callvalue(), fee)
-            if gt(refund, 0) {
-                let success := call(gas(), caller(), refund, 0, 0, 0, 0)
-                if iszero(success) { revert(0, 0) }
+        // Send fee to treasury (assembly call, no 2300 gas limit)
+        if (fee > 0) {
+            address _treasury = treasury;
+            assembly {
+                if iszero(call(gas(), _treasury, fee, 0, 0, 0, 0)) {
+                    revert(0, 0)
+                }
             }
         }
         

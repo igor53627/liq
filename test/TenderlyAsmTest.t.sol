@@ -45,9 +45,9 @@ contract TenderlyAsmTest is Test {
     receive() external payable {}
     
     function setUp() public {
-        lender = new LIQFlashUSDCAsm();
-        borrower = new MockBorrower();
         treasury = address(this);
+        lender = new LIQFlashUSDCAsm(treasury);
+        borrower = new MockBorrower();
         
         // Fund the lender with USDC via deposit (updates poolBalance)
         vm.prank(USDC_WHALE);
