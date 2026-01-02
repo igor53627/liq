@@ -22,8 +22,12 @@ Report vulnerabilities to: security@liq.protocol
 
 **Design Decision**: Only USDC (0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48) is supported.
 
+**Enforcement** (ERC-3156 compliant):
+- `flashLoan()`: Reverts if token != USDC
+- `flashFee()`: Reverts if token != USDC
+- `maxFlashLoan()`: Returns 0 if token != USDC
+
 **Implication**: 
-- Token parameter in `flashLoan` is ignored
 - If USDC is paused/blacklisted, loans will fail
 - No risk of token confusion attacks
 
@@ -37,20 +41,26 @@ Report vulnerabilities to: security@liq.protocol
 - `deposit()`: poolBalance += amount
 - `withdraw()`: poolBalance -= amount
 - Flash loan: verified via `balanceOf() >= poolBalance` after callback
+- Reentrancy guard: prevents deposit/withdraw during callback
 
 **Risk**: If someone sends USDC directly to contract (not via deposit), poolBalance will be less than actual balance. This is safe - it just means extra USDC is locked until owner withdraws.
 
-### 4. No Reentrancy Guard
+### 4. Reentrancy Guard
 
-**Design Decision**: No explicit reentrancy protection.
+**Design Decision**: Lightweight reentrancy lock (slot 2) protects poolBalance invariant.
 
-**Rationale**: The balance check is atomic. Any reentrancy that doesn't repay will fail the check.
+**Protected functions**:
+- `flashLoan()`: Sets lock before callback, clears after
+- `deposit()`: Blocked during flash loan callback
+- `withdraw()`: Blocked during flash loan callback
 
-**Scenario**: Attacker reenters during callback:
-1. First loan: 1000 USDC sent out, expectedBal = 1000
-2. Reentrant loan: Another 1000 sent out, but poolBalance still 1000
-3. After callbacks: balance must be >= 1000
-4. If attacker has 1000, first loan passes; if not, both revert
+**Why needed**: Without the guard, a malicious receiver could call `deposit()` during callback with borrowed funds, desyncing `poolBalance` from actual balance. This would permanently brick the pool (DoS) at no cost to attacker.
+
+**Attack prevented**:
+1. Attacker borrows 1000 USDC
+2. In callback, calls `deposit(1000)` with borrowed funds
+3. Without guard: poolBalance becomes 2000, but only 1000 USDC exists
+4. With guard: deposit() reverts with LOCKED
 
 ### 5. Owner Privileges
 
@@ -91,17 +101,19 @@ The owner can:
 ## Invariants
 
 1. `USDC.balanceOf(this) >= poolBalance` (always, after any tx)
-2. `poolBalance` only changes via deposit/withdraw
+2. `poolBalance` only changes via deposit/withdraw (outside of flash loan callback)
 3. Flash loans are atomic (repaid or reverted)
+4. `locked` is 0 outside of flashLoan execution
 
 ## Attack Vectors Considered
 
 | Attack | Mitigation |
 |--------|------------|
 | Flash loan not repaid | Balance check reverts tx |
-| Reentrancy | Balance check is atomic |
+| Reentrancy during callback | Reentrancy guard blocks deposit/withdraw |
+| poolBalance desync DoS | Reentrancy guard prevents |
 | Integer overflow | Practically impossible for USDC amounts |
-| Token confusion | Only USDC hardcoded |
+| Token confusion | Token parameter enforced == USDC |
 | Callback manipulation | Callback return ignored |
 | Frontrunning | Not applicable (no price oracles) |
 | Griefing | Reverts are cheap for attacker too |
@@ -109,7 +121,9 @@ The owner can:
 ## Recommendations for Auditors
 
 1. Verify Yul assembly is correct for each function selector
-2. Check storage slot assignments (0 = owner, 1 = poolBalance)
+2. Check storage slot assignments (0 = owner, 1 = poolBalance, 2 = locked)
 3. Verify USDC address is correct mainnet address
 4. Confirm balance check logic prevents theft
 5. Review gas optimizations don't introduce vulnerabilities
+6. Verify reentrancy guard properly protects poolBalance invariant
+7. Confirm token parameter enforcement is correct in all ERC-3156 functions
