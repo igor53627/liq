@@ -49,13 +49,11 @@ contract YulTest is Test {
     
     LIQFlashYul lender;
     MockBorrower borrower;
-    address treasury;
     
     receive() external payable {}
     
     function setUp() public {
-        treasury = address(this);
-        lender = new LIQFlashYul(treasury);
+        lender = new LIQFlashYul();
         borrower = new MockBorrower();
         
         // Fund lender via deposit

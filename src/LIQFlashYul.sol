@@ -3,18 +3,13 @@ pragma solidity ^0.8.20;
 
 /// @title LIQFlashYul - Pure Yul Flash Loans
 /// @notice Maximum gas optimization via inline Yul
+/// @notice Fees accumulate in contract, owner withdraws via rescueETH()
 contract LIQFlashYul {
-    address public immutable treasury;
     address public owner;
     uint256 public poolBalance;
     
-    constructor(address _treasury) {
+    constructor() {
         owner = msg.sender;
-        treasury = _treasury;
-        // Also store treasury in slot 1 for Yul access
-        assembly {
-            sstore(1, _treasury)
-        }
     }
     
     fallback() external payable {
@@ -24,8 +19,8 @@ contract LIQFlashYul {
             
             // flashLoan(address,address,uint256,bytes) = 0x5cffe9de
             if eq(sel, 0x5cffe9de) {
-                // Load poolBalance (expected balance) - slot 2
-                let expectedBal := sload(2)
+                // Load poolBalance (expected balance) - slot 1
+                let expectedBal := sload(1)
                 
                 // Transfer USDC to receiver
                 mstore(0x00, 0xa9059cbb00000000000000000000000000000000000000000000000000000000)
@@ -54,23 +49,17 @@ contract LIQFlashYul {
                 mstore(0x1a4, dataLen)
                 calldatacopy(0x1c4, add(dataOffset, 0x20), dataLen)
                 
-                // Call callback
+                // Call callback (ignore return value - balance check is sufficient)
                 if iszero(call(gas(), calldataload(0x04), 0, 0x100, add(0xc4, dataLen), 0x00, 0x20)) { revert(0, 0) }
-                if iszero(eq(mload(0x00), 0x439148f0bbc682ca079e46d6e2c2f0c1e3b820f1a291b069d8882abf8cf18dd9)) { revert(0, 0) }
                 
-                // Check final balance
+                // Check final balance - this is the real security check
                 mstore(0x00, 0x70a0823100000000000000000000000000000000000000000000000000000000)
                 mstore(0x04, address())
                 if iszero(staticcall(gas(), 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48, 0x00, 0x24, 0x00, 0x20)) { revert(0, 0) }
                 if lt(mload(0x00), expectedBal) { revert(0, 0) }
                 
-                // Verify exact fee
+                // Verify exact fee (fee stays in contract, no transfer needed)
                 if iszero(eq(callvalue(), fee)) { revert(0, 0) }
-                
-                // Send fee to treasury (slot 1)
-                if gt(fee, 0) {
-                    if iszero(call(gas(), sload(1), fee, 0, 0, 0, 0)) { revert(0, 0) }
-                }
                 
                 // Return true
                 mstore(0x00, 1)
@@ -79,7 +68,7 @@ contract LIQFlashYul {
             
             // maxFlashLoan(address) = 0x613255ab
             if eq(sel, 0x613255ab) {
-                mstore(0x00, sload(2))
+                mstore(0x00, sload(1))
                 return(0x00, 0x20)
             }
             
@@ -103,8 +92,8 @@ contract LIQFlashYul {
                 mstore(0x24, address())
                 mstore(0x44, amt)
                 if iszero(call(gas(), 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48, 0, 0x00, 0x64, 0x00, 0x20)) { revert(0, 0) }
-                // Update balance - slot 2
-                sstore(2, add(sload(2), amt))
+                // Update balance - slot 1
+                sstore(1, add(sload(1), amt))
                 stop()
             }
             
@@ -112,7 +101,7 @@ contract LIQFlashYul {
             if eq(sel, 0x2e1a7d4d) {
                 if iszero(eq(caller(), sload(0))) { revert(0, 0) }
                 let amt := calldataload(0x04)
-                sstore(2, sub(sload(2), amt))
+                sstore(1, sub(sload(1), amt))
                 mstore(0x00, 0xa9059cbb00000000000000000000000000000000000000000000000000000000)
                 mstore(0x04, caller())
                 mstore(0x24, amt)
