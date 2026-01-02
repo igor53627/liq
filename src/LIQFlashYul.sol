@@ -11,11 +11,12 @@ pragma solidity ^0.8.20;
 /// @dev Storage Layout:
 ///   Slot 0: owner (address) - Can withdraw USDC and rescue ETH
 ///   Slot 1: poolBalance (uint256) - Tracked USDC balance
+///   Slot 2: locked (uint256) - Reentrancy guard (0 = unlocked, 1 = locked)
 ///
 /// @dev Security Model:
 ///   - Optimistic transfer: USDC sent before callback, verified after
 ///   - Balance check ensures repayment: finalBalance >= poolBalance
-///   - No reentrancy guard needed: balance check is atomic protection
+///   - Reentrancy guard prevents poolBalance desync during callback
 ///   - Callback return value not checked (balance verification sufficient)
 ///
 /// @dev Gas Optimization Techniques:
@@ -52,6 +53,11 @@ contract LIQFlashYul {
     /// @dev Stored in slot 1
     /// @dev Updated on deposit/withdraw, verified against actual balance after flash loan
     uint256 public poolBalance;
+
+    /// @notice Reentrancy guard
+    /// @dev Stored in slot 2 (0 = unlocked, 1 = locked)
+    /// @dev Prevents poolBalance desync via reentrant deposit/withdraw during flashLoan
+    uint256 private locked;
 
     /*//////////////////////////////////////////////////////////////
                                CONSTRUCTOR
@@ -104,9 +110,19 @@ contract LIQFlashYul {
             //   - Reverts if USDC not fully repaid
             //------------------------------------------------------
             if eq(sel, 0x5cffe9de) {
+                // Reentrancy guard - prevents poolBalance desync via callback
+                if sload(2) { revert(0, 0) }  // LOCKED
+                sstore(2, 1)
+
                 // Cache calldata values (saves ~6 gas per reuse)
                 let receiver := calldataload(0x04)
+                let token := calldataload(0x24)
                 let amount := calldataload(0x44)
+
+                // Enforce token == USDC (ERC-3156 compliance)
+                if iszero(eq(token, 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48)) {
+                    revert(0, 0)  // UNSUPPORTED_TOKEN
+                }
 
                 // Load poolBalance - this is the minimum balance after repayment
                 // Stored in slot 1
@@ -154,6 +170,9 @@ contract LIQFlashYul {
                     revert(0, 0)  // NOT_REPAID
                 }
 
+                // Unlock reentrancy guard
+                sstore(2, 0)
+
                 // Return true
                 mstore(0x00, 1)
                 return(0x00, 0x20)
@@ -163,10 +182,16 @@ contract LIQFlashYul {
             // maxFlashLoan(address token)
             // Selector: 0x613255ab
             //
-            // @param token - Token address (ignored, always returns USDC balance)
+            // @param token - Token address (returns 0 for non-USDC)
             // @return maxLoan - Maximum available flash loan amount
             //------------------------------------------------------
             if eq(sel, 0x613255ab) {
+                let token := calldataload(0x04)
+                // Return 0 for unsupported tokens (ERC-3156 compliant)
+                if iszero(eq(token, 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48)) {
+                    mstore(0x00, 0)
+                    return(0x00, 0x20)
+                }
                 mstore(0x00, sload(1))  // poolBalance
                 return(0x00, 0x20)
             }
@@ -175,11 +200,16 @@ contract LIQFlashYul {
             // flashFee(address token, uint256 amount)
             // Selector: 0xd9d98ce4
             //
-            // @param token - Token address (ignored)
+            // @param token - Token address (reverts for non-USDC)
             // @param amount - Loan amount (ignored)
             // @return fee - Always 0 (zero fee flash loans)
             //------------------------------------------------------
             if eq(sel, 0xd9d98ce4) {
+                let token := calldataload(0x04)
+                // Revert for unsupported tokens (ERC-3156 spec)
+                if iszero(eq(token, 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48)) {
+                    revert(0, 0)  // UNSUPPORTED_TOKEN
+                }
                 mstore(0x00, 0)
                 return(0x00, 0x20)
             }
@@ -191,8 +221,12 @@ contract LIQFlashYul {
             // @param amount - USDC amount to deposit
             // @dev Requires prior USDC approval
             // @dev Anyone can deposit (adds liquidity)
+            // @dev Blocked during flash loan callback (reentrancy protection)
             //------------------------------------------------------
             if eq(sel, 0xb6b55f25) {
+                // Reentrancy guard - prevent deposit during flashLoan callback
+                if sload(2) { revert(0, 0) }  // LOCKED
+
                 let amt := calldataload(0x04)
 
                 // transferFrom(address from, address to, uint256 amount)
@@ -215,8 +249,12 @@ contract LIQFlashYul {
             //
             // @param amount - USDC amount to withdraw
             // @dev Only owner can withdraw
+            // @dev Blocked during flash loan callback (reentrancy protection)
             //------------------------------------------------------
             if eq(sel, 0x2e1a7d4d) {
+                // Reentrancy guard - prevent withdraw during flashLoan callback
+                if sload(2) { revert(0, 0) }  // LOCKED
+
                 // Owner check (slot 0)
                 if iszero(eq(caller(), sload(0))) {
                     revert(0, 0)  // NOT_OWNER
