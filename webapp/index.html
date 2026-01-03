@@ -443,7 +443,7 @@
         <div class="panel hidden" id="depositPanel">
             <div class="panel-title">Deposit USDC</div>
             <div class="input-group">
-                <label>Amount (USDC)</label>
+                <label for="depositAmount">Amount (USDC)</label>
                 <input type="number" id="depositAmount" placeholder="1000.00" step="0.01">
             </div>
             <button class="btn btn-primary" id="depositBtn">Approve & Deposit</button>
@@ -452,7 +452,7 @@
         <div class="panel hidden" id="withdrawPanel">
             <div class="panel-title">Withdraw USDC</div>
             <div class="input-group">
-                <label>Amount (USDC)</label>
+                <label for="withdrawAmount">Amount (USDC)</label>
                 <input type="number" id="withdrawAmount" placeholder="1000.00" step="0.01">
             </div>
             <button class="btn btn-primary" id="withdrawBtn">Withdraw</button>
@@ -461,7 +461,7 @@
         <!-- Activity Log -->
         <div class="panel">
             <div class="panel-title">Activity Log</div>
-            <div class="log" id="log">
+            <div class="log" id="log" role="log" aria-live="polite" aria-label="Activity log">
                 <div class="log-entry log-info">Welcome to LIQ Flash Loan Dashboard</div>
             </div>
         </div>
@@ -475,6 +475,7 @@
         const LIQ_ADDRESS = '0xe9eb8a0f6328e243086fe6efee0857e14fa2cb87';
         const USDC_ADDRESS = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48';
         const PUBLIC_RPC = 'https://ethereum-rpc.publicnode.com';
+        const MAINNET_CHAIN_ID = 1;
 
         // ABIs
         const LIQ_ABI = [
@@ -548,6 +549,21 @@
             }
 
             try {
+                const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' });
+                const chainId = parseInt(chainIdHex, 16);
+                if (chainId !== MAINNET_CHAIN_ID) {
+                    log(`Wrong network (chain ${chainId}). Please switch to Ethereum Mainnet.`, 'error');
+                    try {
+                        await window.ethereum.request({
+                            method: 'wallet_switchEthereumChain',
+                            params: [{ chainId: '0x1' }],
+                        });
+                    } catch (switchErr) {
+                        log('Failed to switch network', 'error');
+                        return;
+                    }
+                }
+
                 const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
                 userAddress = accounts[0];
 

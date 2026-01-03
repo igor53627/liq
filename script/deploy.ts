@@ -31,6 +31,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { execSync } from "child_process";
 import readline from "readline";
+import { readMnemonic } from "./utils.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -92,46 +93,6 @@ console.error = (...args: any[]) => {
   logStream.write(`[${new Date().toISOString()}] ERROR: ${msg}\n`);
   originalError.apply(console, args);
 };
-
-// ============================================================================
-// Secure Mnemonic Input (no echo)
-// ============================================================================
-
-async function readMnemonic(): Promise<string> {
-  return new Promise((resolve) => {
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-    });
-
-    process.stdout.write(
-      "Enter your 12/24 word mnemonic (will not be echoed): "
-    );
-
-    if (process.stdin.isTTY) {
-      (process.stdin as any).setRawMode(true);
-    }
-
-    let mnemonic = "";
-    process.stdin.on("data", (char) => {
-      const c = char.toString();
-      if (c === "\n" || c === "\r" || c === "\u0004") {
-        if (process.stdin.isTTY) {
-          (process.stdin as any).setRawMode(false);
-        }
-        console.log("");
-        rl.close();
-        resolve(mnemonic);
-      } else if (c === "\u007F" || c === "\b") {
-        mnemonic = mnemonic.slice(0, -1);
-      } else if (c === "\u0003") {
-        process.exit(1);
-      } else {
-        mnemonic += c;
-      }
-    });
-  });
-}
 
 // ============================================================================
 // Confirmation Prompt

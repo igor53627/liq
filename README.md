@@ -146,6 +146,7 @@ npx tsx script/deploy-borrower.ts
 | flashFee(address,uint256) | 0xd9d98ce4 |
 | deposit(uint256) | 0xb6b55f25 |
 | withdraw(uint256) | 0x2e1a7d4d |
+| sync() | 0xfff6cae9 |
 
 ## Gas Breakdown
 

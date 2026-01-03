@@ -35,7 +35,8 @@ contract TestBorrower {
         uint256,
         bytes calldata
     ) external returns (bytes32) {
-        IERC20(USDC).transfer(msg.sender, amount);
+        bool success = IERC20(USDC).transfer(msg.sender, amount);
+        require(success, "transfer failed");
         return CALLBACK_SUCCESS;
     }
 }

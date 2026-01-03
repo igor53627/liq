@@ -15,5 +15,8 @@
   "license": "ISC",
   "dependencies": {
     "viem": "^2.43.5"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0"
   }
 }

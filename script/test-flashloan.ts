@@ -19,7 +19,7 @@ import {
 } from "viem";
 import { mnemonicToAccount, privateKeyToAccount } from "viem/accounts";
 import { mainnet } from "viem/chains";
-import readline from "readline";
+import { readMnemonic } from "./utils.js";
 
 const LIQ_ADDRESS = "0xe9eb8a0f6328e243086fe6efee0857e14fa2cb87";
 const BORROWER_ADDRESS = "0x53cddbcdee2dc2b756a25307f4810c609b28c3e7";
@@ -35,40 +35,6 @@ const BORROWER_ABI = parseAbi([
   "function borrow(address lender, uint256 amount)",
   "function borrowSilent(address lender, uint256 amount)",
 ]);
-
-async function readMnemonic(): Promise<string> {
-  return new Promise((resolve) => {
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-    });
-
-    process.stdout.write("Enter mnemonic: ");
-
-    if (process.stdin.isTTY) {
-      (process.stdin as any).setRawMode(true);
-    }
-
-    let mnemonic = "";
-    process.stdin.on("data", (char) => {
-      const c = char.toString();
-      if (c === "\n" || c === "\r" || c === "\u0004") {
-        if (process.stdin.isTTY) {
-          (process.stdin as any).setRawMode(false);
-        }
-        console.log("");
-        rl.close();
-        resolve(mnemonic);
-      } else if (c === "\u007F" || c === "\b") {
-        mnemonic = mnemonic.slice(0, -1);
-      } else if (c === "\u0003") {
-        process.exit(1);
-      } else {
-        mnemonic += c;
-      }
-    });
-  });
-}
 
 async function main() {
   const amountUSDC = parseFloat(process.argv[2] || "10");
