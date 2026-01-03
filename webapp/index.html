@@ -610,13 +610,13 @@
                 actualBalanceEl.textContent = formatUSDC(actualBal) + ' USDC';
                 ownerAddressEl.textContent = owner;
 
-                if (poolBal === actualBal) {
+                const diff = actualBal - poolBal;
+                if (diff <= 0n) {
                     syncStatusEl.textContent = 'Synced';
                     syncStatusEl.className = 'stat-value synced';
                     statusDot.className = 'status-dot synced';
                     warningBox.classList.add('hidden');
                 } else {
-                    const diff = actualBal - poolBal;
                     syncStatusEl.textContent = `+${formatUSDC(diff)} excess`;
                     syncStatusEl.className = 'stat-value unsynced';
                     statusDot.className = 'status-dot unsynced';
