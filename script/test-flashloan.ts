@@ -72,7 +72,11 @@ async function main() {
   const mnemonic = await readMnemonic();
   const mnemonicAccount = mnemonicToAccount(mnemonic.trim(), { addressIndex: 0 });
   const hdKey = mnemonicAccount.getHdKey();
-  const privateKey = `0x${Buffer.from(hdKey.privateKey!).toString("hex")}` as Hex;
+  if (!hdKey.privateKey) {
+    console.error("[X] Failed to derive private key from mnemonic");
+    process.exit(1);
+  }
+  const privateKey = `0x${Buffer.from(hdKey.privateKey).toString("hex")}` as Hex;
   const account = privateKeyToAccount(privateKey);
 
   console.log(`Sender: ${account.address}`);

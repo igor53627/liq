@@ -178,13 +178,22 @@ async function main() {
       addressIndex: 0,
     });
     const hdKey = mnemonicAccount.getHdKey();
-    const privateKey = `0x${Buffer.from(hdKey.privateKey!).toString(
+    if (!hdKey.privateKey) {
+      console.error("[X] Failed to derive private key from mnemonic");
+      process.exit(1);
+    }
+    const privateKey = `0x${Buffer.from(hdKey.privateKey).toString(
       "hex"
     )}` as Hex;
     account = privateKeyToAccount(privateKey);
     console.log(`Account from mnemonic: ${account.address}`);
   } else if (process.env.PRIVATE_KEY) {
-    account = privateKeyToAccount(process.env.PRIVATE_KEY as Hex);
+    const pk = process.env.PRIVATE_KEY;
+    if (!/^0x[a-fA-F0-9]{64}$/.test(pk)) {
+      console.error("[X] Invalid PRIVATE_KEY format (expected 0x + 64 hex chars)");
+      process.exit(1);
+    }
+    account = privateKeyToAccount(pk as Hex);
     console.log(`Account from PRIVATE_KEY: ${account.address}`);
   } else {
     console.error("[X] No credentials provided");
@@ -350,7 +359,11 @@ async function main() {
   console.log("=".repeat(60));
 }
 
-main().catch((err) => {
-  console.error("[X] Deployment failed:", err);
-  process.exit(1);
-});
+main()
+  .catch((err) => {
+    console.error("[X] Deployment failed:", err);
+    process.exit(1);
+  })
+  .finally(() => {
+    logStream.end();
+  });
