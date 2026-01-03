@@ -104,18 +104,30 @@ interface ILIQFlash {
 - Callback return value (balance check is sufficient security)
 - Token parameter (always USDC)
 
-## Deployment
+## Mainnet Deployment
+
+| Contract | Address | Etherscan |
+|----------|---------|-----------|
+| LIQFlashYul | `0xe9eb8a0f6328e243086fe6efee0857e14fa2cb87` | [View](https://etherscan.io/address/0xe9eb8a0f6328e243086fe6efee0857e14fa2cb87) |
+| TestBorrower | `0x53cddbcdee2dc2b756a25307f4810c609b28c3e7` | [View](https://etherscan.io/address/0x53cddbcdee2dc2b756a25307f4810c609b28c3e7) |
+| USDC | `0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48` | [View](https://etherscan.io/address/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48) |
+
+Owner: `0xaF7EB1455e2939DF433042ba64d06D0Cb478B1c7`
+
+## Development
 
 ```bash
 # Install dependencies
 forge install
 
-# Run tests (requires Tenderly RPC for mainnet fork)
-source ~/.zsh_secrets
-forge test --fork-url "$TENDERLY_VIRTUAL_TESTNET_RPC" --match-contract YulTest -vvv
+# Run tests (mainnet fork)
+forge test --fork-url https://ethereum-rpc.publicnode.com --match-contract YulTest -vvv
 
-# Deploy
-forge create src/LIQFlashYul.sol:LIQFlashYul --rpc-url $RPC_URL --private-key $PRIVATE_KEY
+# Deploy (interactive mnemonic prompt)
+npx tsx script/deploy.ts --mnemonic
+
+# Deploy TestBorrower
+npx tsx script/deploy-borrower.ts
 ```
 
 ## Storage Layout
@@ -134,6 +146,7 @@ forge create src/LIQFlashYul.sol:LIQFlashYul --rpc-url $RPC_URL --private-key $P
 | flashFee(address,uint256) | 0xd9d98ce4 |
 | deposit(uint256) | 0xb6b55f25 |
 | withdraw(uint256) | 0x2e1a7d4d |
+| sync() | 0xfff6cae9 |
 
 ## Gas Breakdown
 
