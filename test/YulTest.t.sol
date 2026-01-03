@@ -16,6 +16,7 @@ interface ILIQFlashYul {
     function flashFee(address token, uint256 amount) external view returns (uint256);
     function deposit(uint256 amount) external;
     function withdraw(uint256 amount) external;
+    function sync() external;
 }
 
 contract MockBorrower {
@@ -205,5 +206,111 @@ contract YulTest is Test {
         attacker.borrow(payable(address(lender)), 10_000e6);
         
         console.log("[PASS] Nested flash loan blocked");
+    }
+    
+    // ========== NEW SECURITY TESTS ==========
+    
+    function testWithdrawUnderflowProtection() public {
+        // Issue #11: Integer underflow in withdraw
+        // Try to withdraw more than poolBalance (should revert)
+        uint256 poolBal = lender.poolBalance();
+        
+        vm.expectRevert();
+        ILIQFlashYul(address(lender)).withdraw(poolBal + 1);
+        
+        console.log("[PASS] Withdraw underflow protection works");
+    }
+    
+    function testWithdrawExactBalance() public {
+        // Should succeed when withdrawing exact poolBalance
+        uint256 poolBal = lender.poolBalance();
+        ILIQFlashYul(address(lender)).withdraw(poolBal);
+        
+        assertEq(lender.poolBalance(), 0, "poolBalance should be 0");
+        console.log("[PASS] Withdraw exact balance works");
+    }
+    
+    function testFlashLoanCannotExceedPoolBalance() public {
+        // Issue #12: Cannot borrow more than poolBalance
+        uint256 poolBal = lender.poolBalance();
+        
+        vm.expectRevert();
+        ILIQFlashYul(address(lender)).flashLoan(
+            address(borrower),
+            address(USDC),
+            poolBal + 1,
+            ""
+        );
+        
+        console.log("[PASS] FlashLoan capped at poolBalance");
+    }
+    
+    function testExcessUSDCDrainableWithoutSync() public {
+        // Issue #12: Excess USDC is drainable until owner calls sync()
+        // Send extra USDC directly to lender (not via deposit)
+        uint256 excessAmount = 1000e6;
+        vm.prank(USDC_WHALE);
+        USDC.transfer(address(lender), excessAmount);
+        
+        uint256 poolBal = lender.poolBalance();
+        uint256 actualBal = USDC.balanceOf(address(lender));
+        assertGt(actualBal, poolBal, "Should have excess USDC");
+        
+        // Flash loan succeeds - excess is NOT protected until sync()
+        borrower.borrow(payable(address(lender)), poolBal);
+        
+        // Balance is still >= poolBalance (repayment check passes)
+        assertGe(USDC.balanceOf(address(lender)), poolBal, "Balance >= poolBalance");
+        console.log("[PASS] Excess USDC drainable without sync (by design)");
+    }
+    
+    function testSyncProtectsExcess() public {
+        // After sync(), excess USDC becomes part of poolBalance and is protected
+        uint256 excessAmount = 1000e6;
+        vm.prank(USDC_WHALE);
+        USDC.transfer(address(lender), excessAmount);
+        
+        uint256 oldPoolBal = lender.poolBalance();
+        uint256 actualBal = USDC.balanceOf(address(lender));
+        
+        // Owner syncs - now poolBalance == actualBalance
+        ILIQFlashYul(address(lender)).sync();
+        
+        assertEq(lender.poolBalance(), actualBal, "poolBalance should equal actual");
+        assertGt(lender.poolBalance(), oldPoolBal, "poolBalance should have increased");
+        
+        // Now excess is protected - can only borrow up to new poolBalance
+        uint256 newPoolBal = lender.poolBalance();
+        borrower.borrow(payable(address(lender)), newPoolBal);
+        
+        assertGe(USDC.balanceOf(address(lender)), newPoolBal, "Full repayment required");
+        console.log("[PASS] sync() protects excess USDC");
+    }
+    
+    function testSyncOnlyOwner() public {
+        vm.prank(address(0xBEEF));
+        vm.expectRevert();
+        ILIQFlashYul(address(lender)).sync();
+        
+        console.log("[PASS] sync() only callable by owner");
+    }
+    
+    function testNoETHAccepted() public {
+        // Issue #13: Contract should not accept ETH
+        // Low-level call returns false on revert, not throwing
+        (bool success,) = address(lender).call{value: 1 ether}("");
+        assertFalse(success, "ETH should not be accepted");
+        
+        console.log("[PASS] ETH transfers rejected");
+    }
+    
+    function testUnknownSelectorReverts() public {
+        // Unknown function selectors should revert (not silently succeed)
+        bytes memory unknownCall = abi.encodeWithSignature("unknownFunction()");
+        
+        (bool success,) = address(lender).call(unknownCall);
+        assertFalse(success, "Unknown selector should revert");
+        
+        console.log("[PASS] Unknown selectors revert");
     }
 }

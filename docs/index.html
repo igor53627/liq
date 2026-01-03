@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LIQ Flash Loan - Owner Dashboard</title>
+    <style>
+        :root {
+            --bg-primary: #282a36;
+            --bg-secondary: #44475a;
+            --bg-panel: rgba(68, 71, 90, 0.7);
+            --text-primary: #f8f8f2;
+            --text-secondary: #6272a4;
+            --text-muted: #d0d3e8;
+            --accent-cyan: #8be9fd;
+            --accent-green: #50fa7b;
+            --accent-orange: #ffb86c;
+            --accent-pink: #ff79c6;
+            --accent-purple: #bd93f9;
+            --accent-red: #ff5555;
+            --accent-yellow: #f1fa8c;
+        }
+
+        html {
+            font-size: 16px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 1rem;
+            line-height: 1.5;
+            background: linear-gradient(135deg, #1a1b26 0%, #282a36 50%, #1a1b26 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--bg-secondary);
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            min-height: 44px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn:focus-visible {
+            outline: 2px solid var(--accent-cyan);
+            outline-offset: 2px;
+        }
+
+        .btn-connect {
+            background: var(--accent-purple);
+            color: var(--bg-primary);
+        }
+
+        .btn-connect:hover {
+            background: var(--accent-pink);
+        }
+
+        .btn-connect.connected {
+            background: var(--accent-green);
+        }
+
+        .btn-primary {
+            background: var(--accent-cyan);
+            color: var(--bg-primary);
+            width: 100%;
+            margin-top: 1rem;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-green);
+        }
+
+        .btn-primary:disabled {
+            background: var(--bg-secondary);
+            cursor: not-allowed;
+        }
+
+        .panel {
+            background: var(--bg-panel);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--bg-secondary);
+        }
+
+        .panel-title {
+            font-size: 1.15rem;
+            line-height: 1.3;
+            color: var(--accent-cyan);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .stat {
+            background: var(--bg-primary);
+            padding: 1rem;
+            border-radius: 8px;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+            line-height: 1.5;
+        }
+
+        .stat-value {
+            font-size: 1rem;
+            font-weight: bold;
+            word-break: break-all;
+        }
+
+        .stat-value.synced {
+            color: var(--accent-green);
+        }
+
+        .stat-value.unsynced {
+            color: var(--accent-orange);
+        }
+
+        .input-group {
+            margin-bottom: 1rem;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 0.75rem;
+            min-height: 44px;
+            background: var(--bg-primary);
+            border: 1px solid var(--bg-secondary);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 1rem;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: var(--accent-cyan);
+        }
+
+        .input-group input:focus-visible {
+            outline: 2px solid var(--accent-cyan);
+            outline-offset: 2px;
+        }
+
+        .log {
+            background: var(--bg-primary);
+            border-radius: 8px;
+            padding: 1rem;
+            max-height: 200px;
+            overflow-y: auto;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .log-entry {
+            padding: 0.25rem 0;
+            padding-left: 0.5rem;
+            border-bottom: 1px solid var(--bg-secondary);
+            border-left: 3px solid transparent;
+            color: var(--text-primary);
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .log-time {
+            color: var(--text-muted);
+        }
+
+        .log-success {
+            border-left-color: var(--accent-green);
+        }
+
+        .log-error {
+            border-left-color: var(--accent-red);
+        }
+
+        .log-info {
+            border-left-color: var(--accent-cyan);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .status-dot.synced {
+            background: var(--accent-green);
+        }
+
+        .status-dot.unsynced {
+            background: var(--accent-orange);
+        }
+
+        .status-dot.loading {
+            background: var(--accent-red);
+        }
+
+        /* Tooltip styles */
+        .tooltip {
+            position: relative;
+            cursor: help;
+        }
+
+        .tooltip::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg-primary);
+            border: 1px solid var(--bg-secondary);
+            color: var(--text-primary);
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            line-height: 1.4;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s, visibility 0.2s;
+            z-index: 100;
+            margin-bottom: 4px;
+        }
+
+        .tooltip:hover::after {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .help-icon {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            line-height: 14px;
+            text-align: center;
+            font-size: 0.65rem;
+            background: var(--bg-secondary);
+            border-radius: 50%;
+            color: var(--text-secondary);
+            margin-left: 4px;
+            cursor: help;
+        }
+
+        .warning-box {
+            background: rgba(255, 184, 108, 0.1);
+            border: 1px solid var(--accent-orange);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            font-size: 0.85rem;
+            color: var(--accent-orange);
+        }
+
+        .actions-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+        }
+
+        .action-btn {
+            padding: 0.75rem 1rem;
+            min-height: 44px;
+            background: var(--bg-primary);
+            border: 1px solid var(--bg-secondary);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .action-btn:focus-visible {
+            outline: 2px solid var(--accent-cyan);
+            outline-offset: 2px;
+        }
+
+        .action-btn:hover {
+            border-color: var(--accent-cyan);
+            background: var(--bg-secondary);
+        }
+
+        .action-btn.active {
+            border-color: var(--accent-cyan);
+            background: rgba(139, 233, 253, 0.1);
+        }
+
+        .action-icon {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .contract-info {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--bg-secondary);
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            word-break: break-all;
+        }
+
+        .contract-info a {
+            color: var(--accent-cyan);
+            text-decoration: none;
+        }
+
+        .contract-info a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">LIQ Flash Loan</div>
+            <button id="connectBtn" class="btn btn-connect">Connect Wallet</button>
+        </header>
+
+        <!-- Status Panel -->
+        <div class="panel">
+            <div class="panel-title">
+                <span class="status-dot loading" id="statusDot"></span>
+                Pool Status
+            </div>
+            <div class="stats-grid">
+                <div class="stat">
+                    <div class="stat-label">Pool Balance (tracked)</div>
+                    <div class="stat-value" id="poolBalance">-</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Actual USDC Balance</div>
+                    <div class="stat-value" id="actualBalance">-</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">
+                        Sync Status
+                        <span class="help-icon tooltip" data-tooltip="Synced = poolBalance matches actual USDC balance">?</span>
+                    </div>
+                    <div class="stat-value" id="syncStatus">-</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Owner</div>
+                    <div class="stat-value" id="ownerAddress">-</div>
+                </div>
+            </div>
+            <div class="contract-info">
+                Contract: <a href="https://etherscan.io/address/0xe9eb8a0f6328e243086fe6efee0857e14fa2cb87" target="_blank" id="contractLink">0xe9eb8a0f6328e243086fe6efee0857e14fa2cb87</a>
+            </div>
+        </div>
+
+        <!-- Warning Box (shown when unsynced) -->
+        <div class="warning-box hidden" id="warningBox">
+            [!] Excess USDC detected. Call sync() to protect it from being drained.
+        </div>
+
+        <!-- Actions Panel -->
+        <div class="panel">
+            <div class="panel-title">Actions</div>
+            <div class="actions-row">
+                <button class="action-btn" id="syncAction" data-action="sync">
+                    <div class="action-icon">[S]</div>
+                    <div>Sync</div>
+                </button>
+                <button class="action-btn" id="depositAction" data-action="deposit">
+                    <div class="action-icon">[+]</div>
+                    <div>Deposit</div>
+                </button>
+                <button class="action-btn" id="withdrawAction" data-action="withdraw">
+                    <div class="action-icon">[-]</div>
+                    <div>Withdraw</div>
+                </button>
+            </div>
+        </div>
+
+        <!-- Action Forms -->
+        <div class="panel hidden" id="syncPanel">
+            <div class="panel-title">Sync Pool Balance</div>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem; font-size: 0.9rem;">
+                Sets poolBalance = USDC.balanceOf(this). Call after any direct USDC transfers.
+            </p>
+            <button class="btn btn-primary" id="syncBtn">Sync Now</button>
+        </div>
+
+        <div class="panel hidden" id="depositPanel">
+            <div class="panel-title">Deposit USDC</div>
+            <div class="input-group">
+                <label>Amount (USDC)</label>
+                <input type="number" id="depositAmount" placeholder="1000.00" step="0.01">
+            </div>
+            <button class="btn btn-primary" id="depositBtn">Approve & Deposit</button>
+        </div>
+
+        <div class="panel hidden" id="withdrawPanel">
+            <div class="panel-title">Withdraw USDC</div>
+            <div class="input-group">
+                <label>Amount (USDC)</label>
+                <input type="number" id="withdrawAmount" placeholder="1000.00" step="0.01">
+            </div>
+            <button class="btn btn-primary" id="withdrawBtn">Withdraw</button>
+        </div>
+
+        <!-- Activity Log -->
+        <div class="panel">
+            <div class="panel-title">Activity Log</div>
+            <div class="log" id="log">
+                <div class="log-entry log-info">Welcome to LIQ Flash Loan Dashboard</div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createPublicClient, createWalletClient, http, custom, formatUnits, parseUnits } from 'https://esm.sh/viem@2';
+        import { mainnet } from 'https://esm.sh/viem@2/chains';
+
+        // Contract addresses
+        const LIQ_ADDRESS = '0xe9eb8a0f6328e243086fe6efee0857e14fa2cb87';
+        const USDC_ADDRESS = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48';
+        const PUBLIC_RPC = 'https://ethereum-rpc.publicnode.com';
+
+        // ABIs
+        const LIQ_ABI = [
+            { name: 'poolBalance', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
+            { name: 'owner', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'address' }] },
+            { name: 'sync', type: 'function', stateMutability: 'nonpayable', inputs: [], outputs: [] },
+            { name: 'deposit', type: 'function', stateMutability: 'nonpayable', inputs: [{ name: 'amount', type: 'uint256' }], outputs: [] },
+            { name: 'withdraw', type: 'function', stateMutability: 'nonpayable', inputs: [{ name: 'amount', type: 'uint256' }], outputs: [] },
+        ];
+
+        const ERC20_ABI = [
+            { name: 'balanceOf', type: 'function', stateMutability: 'view', inputs: [{ name: 'account', type: 'address' }], outputs: [{ type: 'uint256' }] },
+            { name: 'approve', type: 'function', stateMutability: 'nonpayable', inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }], outputs: [{ type: 'bool' }] },
+            { name: 'allowance', type: 'function', stateMutability: 'view', inputs: [{ name: 'owner', type: 'address' }, { name: 'spender', type: 'address' }], outputs: [{ type: 'uint256' }] },
+        ];
+
+        // State
+        let publicClient = null;
+        let walletClient = null;
+        let userAddress = null;
+        let connected = false;
+
+        // DOM elements
+        const connectBtn = document.getElementById('connectBtn');
+        const statusDot = document.getElementById('statusDot');
+        const poolBalanceEl = document.getElementById('poolBalance');
+        const actualBalanceEl = document.getElementById('actualBalance');
+        const syncStatusEl = document.getElementById('syncStatus');
+        const ownerAddressEl = document.getElementById('ownerAddress');
+        const warningBox = document.getElementById('warningBox');
+        const logEl = document.getElementById('log');
+        const actionBtns = document.querySelectorAll('.action-btn');
+        const syncPanel = document.getElementById('syncPanel');
+        const depositPanel = document.getElementById('depositPanel');
+        const withdrawPanel = document.getElementById('withdrawPanel');
+
+        // Logging
+        function log(message, type = 'info') {
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.innerHTML = `<span class="log-time">[${time}]</span> ${message}`;
+            logEl.appendChild(entry);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        // Format USDC (6 decimals)
+        function formatUSDC(amount) {
+            return Number(formatUnits(amount, 6)).toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        // Initialize public client (read-only)
+        async function init() {
+            publicClient = createPublicClient({
+                chain: mainnet,
+                transport: http(PUBLIC_RPC),
+            });
+            log('Loading pool stats...', 'info');
+            await refreshData();
+            log('Pool stats loaded', 'success');
+        }
+
+        // Connect wallet
+        async function connect() {
+            if (!window.ethereum) {
+                log('MetaMask not detected', 'error');
+                return;
+            }
+
+            try {
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                userAddress = accounts[0];
+
+                walletClient = createWalletClient({
+                    chain: mainnet,
+                    transport: custom(window.ethereum),
+                    account: userAddress,
+                });
+
+                connected = true;
+                connectBtn.textContent = userAddress.slice(0, 6) + '...' + userAddress.slice(-4);
+                connectBtn.classList.add('connected');
+
+                log(`Connected: ${userAddress}`, 'success');
+                await refreshData();
+            } catch (err) {
+                log(`Connection failed: ${err.message}`, 'error');
+            }
+        }
+
+        // Refresh contract data
+        async function refreshData() {
+            if (!publicClient) return;
+
+            try {
+                const [poolBal, actualBal, owner] = await Promise.all([
+                    publicClient.readContract({ address: LIQ_ADDRESS, abi: LIQ_ABI, functionName: 'poolBalance' }),
+                    publicClient.readContract({ address: USDC_ADDRESS, abi: ERC20_ABI, functionName: 'balanceOf', args: [LIQ_ADDRESS] }),
+                    publicClient.readContract({ address: LIQ_ADDRESS, abi: LIQ_ABI, functionName: 'owner' }),
+                ]);
+
+                poolBalanceEl.textContent = formatUSDC(poolBal) + ' USDC';
+                actualBalanceEl.textContent = formatUSDC(actualBal) + ' USDC';
+                ownerAddressEl.textContent = owner;
+
+                if (poolBal === actualBal) {
+                    syncStatusEl.textContent = 'Synced';
+                    syncStatusEl.className = 'stat-value synced';
+                    statusDot.className = 'status-dot synced';
+                    warningBox.classList.add('hidden');
+                } else {
+                    const diff = actualBal - poolBal;
+                    syncStatusEl.textContent = `+${formatUSDC(diff)} excess`;
+                    syncStatusEl.className = 'stat-value unsynced';
+                    statusDot.className = 'status-dot unsynced';
+                    warningBox.classList.remove('hidden');
+                }
+            } catch (err) {
+                log(`Failed to fetch data: ${err.message}`, 'error');
+            }
+        }
+
+        // Action handlers
+        async function handleSync() {
+            if (!connected) { log('Connect wallet first', 'error'); return; }
+            log('Syncing pool balance...', 'info');
+            try {
+                const hash = await walletClient.writeContract({
+                    address: LIQ_ADDRESS, abi: LIQ_ABI, functionName: 'sync',
+                });
+                log(`Tx sent: ${hash}`, 'info');
+                await publicClient.waitForTransactionReceipt({ hash });
+                log('Sync complete!', 'success');
+                await refreshData();
+            } catch (err) {
+                log(`Sync failed: ${err.message}`, 'error');
+            }
+        }
+
+        async function handleDeposit() {
+            if (!connected) { log('Connect wallet first', 'error'); return; }
+            const amount = document.getElementById('depositAmount').value;
+            if (!amount || parseFloat(amount) <= 0) { log('Invalid amount', 'error'); return; }
+
+            const amountBigInt = parseUnits(amount, 6);
+            log(`Depositing ${amount} USDC...`, 'info');
+
+            try {
+                const allowance = await publicClient.readContract({
+                    address: USDC_ADDRESS, abi: ERC20_ABI, functionName: 'allowance',
+                    args: [userAddress, LIQ_ADDRESS],
+                });
+
+                if (allowance < amountBigInt) {
+                    log('Approving USDC...', 'info');
+                    const approveHash = await walletClient.writeContract({
+                        address: USDC_ADDRESS, abi: ERC20_ABI, functionName: 'approve',
+                        args: [LIQ_ADDRESS, amountBigInt],
+                    });
+                    await publicClient.waitForTransactionReceipt({ hash: approveHash });
+                    log('Approval complete', 'success');
+                }
+
+                const hash = await walletClient.writeContract({
+                    address: LIQ_ADDRESS, abi: LIQ_ABI, functionName: 'deposit',
+                    args: [amountBigInt],
+                });
+                log(`Tx sent: ${hash}`, 'info');
+                await publicClient.waitForTransactionReceipt({ hash });
+                log(`Deposited ${amount} USDC!`, 'success');
+                await refreshData();
+            } catch (err) {
+                log(`Deposit failed: ${err.message}`, 'error');
+            }
+        }
+
+        async function handleWithdraw() {
+            if (!connected) { log('Connect wallet first', 'error'); return; }
+            const amount = document.getElementById('withdrawAmount').value;
+            if (!amount || parseFloat(amount) <= 0) { log('Invalid amount', 'error'); return; }
+
+            const amountBigInt = parseUnits(amount, 6);
+            log(`Withdrawing ${amount} USDC...`, 'info');
+
+            try {
+                const hash = await walletClient.writeContract({
+                    address: LIQ_ADDRESS, abi: LIQ_ABI, functionName: 'withdraw',
+                    args: [amountBigInt],
+                });
+                log(`Tx sent: ${hash}`, 'info');
+                await publicClient.waitForTransactionReceipt({ hash });
+                log(`Withdrew ${amount} USDC!`, 'success');
+                await refreshData();
+            } catch (err) {
+                log(`Withdraw failed: ${err.message}`, 'error');
+            }
+        }
+
+        // Event listeners
+        connectBtn.addEventListener('click', connect);
+
+        actionBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                actionBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const action = btn.dataset.action;
+                syncPanel.classList.toggle('hidden', action !== 'sync');
+                depositPanel.classList.toggle('hidden', action !== 'deposit');
+                withdrawPanel.classList.toggle('hidden', action !== 'withdraw');
+            });
+        });
+
+        document.getElementById('syncBtn').addEventListener('click', handleSync);
+        document.getElementById('depositBtn').addEventListener('click', handleDeposit);
+        document.getElementById('withdrawBtn').addEventListener('click', handleWithdraw);
+
+        // Auto-refresh every 30s
+        setInterval(refreshData, 30000);
+
+        // Initialize on load
+        init();
+    </script>
+</body>
+</html>

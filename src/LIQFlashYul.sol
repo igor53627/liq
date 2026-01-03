@@ -9,7 +9,7 @@ pragma solidity ^0.8.20;
 /// @custom:security-contact security@liq.protocol
 ///
 /// @dev Storage Layout:
-///   Slot 0: owner (address) - Can withdraw USDC and rescue ETH
+///   Slot 0: owner (address) - Can withdraw USDC
 ///   Slot 1: poolBalance (uint256) - Tracked USDC balance
 ///   Slot 2: locked (uint256) - Reentrancy guard (0 = unlocked, 1 = locked)
 ///
@@ -32,6 +32,7 @@ pragma solidity ^0.8.20;
 ///   - flashFee(address,uint256) [0xd9d98ce4] - Always returns 0
 ///   - deposit(uint256) [0xb6b55f25] - Deposit USDC (requires approval)
 ///   - withdraw(uint256) [0x2e1a7d4d] - Withdraw USDC (owner only)
+///   - sync() [0xfff6cae9] - Sync poolBalance to actual balance (owner only)
 contract LIQFlashYul {
     /*//////////////////////////////////////////////////////////////
                                 CONSTANTS
@@ -80,7 +81,7 @@ contract LIQFlashYul {
     ///   - 0xd9d98ce4: flashFee(address,uint256)
     ///   - 0xb6b55f25: deposit(uint256)
     ///   - 0x2e1a7d4d: withdraw(uint256)
-    fallback() external payable {
+    fallback() external {
         assembly {
             //------------------------------------------------------
             // DISPATCHER
@@ -124,9 +125,13 @@ contract LIQFlashYul {
                     revert(0, 0)  // UNSUPPORTED_TOKEN
                 }
 
-                // Load poolBalance - this is the minimum balance after repayment
-                // Stored in slot 1
-                let expectedBal := sload(1)
+                // Load poolBalance for borrow cap and repayment check
+                let poolBal := sload(1)
+
+                // Prevent borrowing more than tracked pool
+                if gt(amount, poolBal) {
+                    revert(0, 0)  // AMOUNT_EXCEEDS_POOL
+                }
 
                 // Transfer USDC to receiver
                 // transfer(address to, uint256 amount)
@@ -159,16 +164,26 @@ contract LIQFlashYul {
                     revert(0, 0)
                 }
 
-                // Verify repayment: actual balance >= expected balance
-                // balanceOf(address account)
+                // Verify repayment: final balance >= poolBalance
+                // Owner must call sync() to protect any excess USDC from direct transfers
                 mstore(0x00, 0x70a0823100000000000000000000000000000000000000000000000000000000)
                 mstore(0x04, address())
                 if iszero(staticcall(gas(), 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48, 0x00, 0x24, 0x00, 0x20)) {
                     revert(0, 0)
                 }
-                if lt(mload(0x00), expectedBal) {
+                if lt(mload(0x00), poolBal) {
                     revert(0, 0)  // NOT_REPAID
                 }
+
+                // Emit FlashLoan(receiver, token, amount)
+                // topic0 = keccak256("FlashLoan(address,address,uint256)") = 0xc76f1b4f...
+                mstore(0x00, amount)
+                log3(
+                    0x00, 0x20,
+                    0xc76f1b4fe4396ac07a9fa55a415d4ca430e72651d37d3401f3bed7cb13fc4f12,
+                    receiver,
+                    0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
+                )
 
                 // Unlock reentrancy guard
                 sstore(2, 0)
@@ -255,19 +270,27 @@ contract LIQFlashYul {
                 // Reentrancy guard - prevent withdraw during flashLoan callback
                 if sload(2) { revert(0, 0) }  // LOCKED
 
+                let c := caller()
+
                 // Owner check (slot 0)
-                if iszero(eq(caller(), sload(0))) {
+                if iszero(eq(c, sload(0))) {
                     revert(0, 0)  // NOT_OWNER
                 }
 
                 let amt := calldataload(0x04)
+                let currentBal := sload(1)
+
+                // Underflow protection: revert if amt > poolBalance
+                if gt(amt, currentBal) {
+                    revert(0, 0)  // INSUFFICIENT_BALANCE
+                }
 
                 // Update poolBalance first (slot 1)
-                sstore(1, sub(sload(1), amt))
+                sstore(1, sub(currentBal, amt))
 
                 // transfer(address to, uint256 amount)
                 mstore(0x00, 0xa9059cbb00000000000000000000000000000000000000000000000000000000)
-                mstore(0x04, caller())
+                mstore(0x04, c)
                 mstore(0x24, amt)
                 if iszero(call(gas(), 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48, 0, 0x00, 0x44, 0x00, 0x20)) {
                     revert(0, 0)
@@ -276,25 +299,44 @@ contract LIQFlashYul {
             }
 
             //------------------------------------------------------
-            // Fallback: Accept ETH (for rescueETH)
+            // sync()
+            // Selector: 0xfff6cae9
+            //
+            // @dev Syncs poolBalance to actual USDC balance
+            // @dev Only owner can call, blocked during flash loan
+            // @dev Call after direct USDC transfers to protect excess
             //------------------------------------------------------
-            stop()
+            if eq(sel, 0xfff6cae9) {
+                // Reentrancy guard - prevent sync during flashLoan callback
+                if sload(2) { revert(0, 0) }  // LOCKED
+
+                // Owner check (slot 0)
+                if iszero(eq(caller(), sload(0))) {
+                    revert(0, 0)  // NOT_OWNER
+                }
+
+                // Get actual USDC balance
+                mstore(0x00, 0x70a0823100000000000000000000000000000000000000000000000000000000)
+                mstore(0x04, address())
+                if iszero(staticcall(gas(), 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48, 0x00, 0x24, 0x00, 0x20)) {
+                    revert(0, 0)
+                }
+
+                // Update poolBalance to actual balance (slot 1)
+                sstore(1, mload(0x00))
+                stop()
+            }
+
+            //------------------------------------------------------
+            // Unknown selector: revert
+            //------------------------------------------------------
+            revert(0, 0)
         }
     }
-
-    /// @notice Accept ETH transfers
-    receive() external payable {}
 
     /*//////////////////////////////////////////////////////////////
                               ADMIN FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-
-    /// @notice Rescue ETH accidentally sent to contract
-    /// @dev Only callable by owner
-    function rescueETH() external {
-        require(msg.sender == owner, "NOT_OWNER");
-        payable(owner).transfer(address(this).balance);
-    }
 
     /// @notice Transfer ownership
     /// @param newOwner New owner address

@@ -1,0 +1,19 @@
+{
+  "version": "1.0.0",
+  "deployedAt": "2026-01-03T13:27:17.442Z",
+  "network": "mainnet",
+  "chainId": 1,
+  "dryRun": false,
+  "rpcUrl": "https://ethereum-rpc.publicnode.com",
+  "deployer": "0xaF7EB1455e2939DF433042ba64d06D0Cb478B1c7",
+  "deployTxHash": "0xea244056fcadb1f050b2e2985c7323a78c25c27c9f96f742eadb2ebba8348c7d",
+  "contract": {
+    "name": "LIQFlashYul",
+    "address": "0xe9eb8a0f6328e243086fe6efee0857e14fa2cb87",
+    "bytecodeHash": "0x71d202813f79fe1144cda7c1a46121c32487209d8381ce2bf27d080465ed9d75"
+  },
+  "gasUsed": "500982",
+  "verification": {
+    "command": "forge verify-contract 0xe9eb8a0f6328e243086fe6efee0857e14fa2cb87 src/LIQFlashYul.sol:LIQFlashYul --chain mainnet"
+  }
+}

@@ -1,2 +1,6 @@
 *.csv
 out/
+cache/
+node_modules/
+*.log
+.DS_Store
