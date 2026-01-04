@@ -2,8 +2,6 @@
 
 [![CI](https://github.com/igor53627/liq/actions/workflows/ci.yml/badge.svg)](https://github.com/igor53627/liq/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Solidity](https://img.shields.io/badge/Solidity-%5E0.8.20-blue)](https://soliditylang.org/)
-[![Foundry](https://img.shields.io/badge/Built%20with-Foundry-orange)](https://book.getfoundry.sh/)
 [![Deployed on Ethereum](https://img.shields.io/badge/Deployed-Ethereum%20Mainnet-blue)](https://etherscan.io/address/0xe9eb8a0f6328e243086fe6efee0857e14fa2cb87)
 
 **Zero-fee, gas-optimized USDC flash loans for arbitrage and liquidation bots.**
