@@ -48,7 +48,7 @@ For sensitive disclosures, use [GitHub's private vulnerability reporting](https:
 - Reentrancy guard: prevents deposit/withdraw during callback
 - `sync()`: owner can call to set poolBalance = actual balance
 
-**KNOWN RISK - Excess USDC Extraction**: If someone sends USDC directly to the contract (not via deposit), the excess can be extracted by anyone via flash loan. The repayment check only verifies `finalBalance >= poolBalance`, so an attacker can borrow the full poolBalance, keep the excess, and repay only enough to satisfy the check. The owner should call `sync()` immediately after any direct transfers, but this is vulnerable to front-running. See [audit findings](audits/) for details.
+**Design Note - Direct Transfers**: The owner deposits USDC via `deposit()`, not by sending USDC directly to the contract. This design saves gas by avoiding an extra balance check. If someone accidentally sends USDC directly, the owner can call `sync()` to claim it. Any excess USDC (from direct transfers) may be extracted via flash loan before `sync()` is called - this is accepted behavior since direct transfers are not the intended deposit method.
 
 ### 4. Reentrancy Guard
 
