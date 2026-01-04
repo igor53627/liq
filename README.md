@@ -4,13 +4,15 @@
 
 ## Gas Comparison
 
-| Protocol | Warm Gas | Overhead |
-|----------|----------|----------|
-| Balancer | ~80,000 | ~28,000 |
-| Aave V3 | ~90,000 | ~38,000 |
-| **LIQ** | **40,736** | **~700** |
+| Protocol | Warm Gas | Fee | Notes |
+|----------|----------|-----|-------|
+| Aave V3 | ~90,000 | 0.05% | Complex risk checks |
+| Balancer | ~80,000 | 0% | Multi-token pool overhead |
+| Morpho Blue | ~68,500 | 0% | Minimal but uses approve pattern |
+| Euler V2 | ~55,000 | 0% | EVC auth layer overhead |
+| **LIQ** | **~41,000** | **0%** | **Pure Yul, transfer pattern** |
 
-LIQ is **~50% cheaper** than alternatives.
+LIQ is **40% cheaper** than Morpho and **50%+ cheaper** than Aave/Balancer.
 
 ## Features
 
@@ -150,16 +152,25 @@ npx tsx script/deploy-borrower.ts
 
 ## Gas Breakdown
 
-Total warm gas: **40,736**
+Total warm gas: **~41,000**
 
 | Component | Gas | Notes |
 |-----------|-----|-------|
-| USDC transfer out | ~29,000 | Proxy + implementation |
-| Callback + repay | ~7,000 | Borrower's transfer |
-| balanceOf check | ~2,500 | USDC call |
-| Protocol logic | ~700 | Dispatcher, storage, return |
+| USDC transfer out | ~27,000 | Proxy + implementation (warm) |
+| Callback + repay | ~5,000 | Borrower's transfer back |
+| balanceOf check | ~2,500 | USDC staticcall |
+| Protocol logic | ~700 | Dispatcher, storage, event, return |
 
-The ~40k is USDC's overhead - unavoidable without a different token.
+The ~40k is mostly USDC proxy overhead - unavoidable without a different token.
+
+### Why LIQ beats Morpho/Euler
+
+| Pattern | Callback | Protocol Verify | Total |
+|---------|----------|-----------------|-------|
+| **LIQ** (transfer + balanceOf) | ~5k | ~0.5k | **~5.5k** |
+| Morpho (approve + transferFrom) | ~23k | ~6k | ~29k |
+
+LIQ's `transfer()` + `balanceOf()` pattern is **~5x more efficient** for repayment than the `approve()` + `transferFrom()` pattern used by Morpho.
 
 ## License
 
