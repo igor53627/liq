@@ -86,74 +86,53 @@ This indicates real-world flash loans include at minimum ~40-55k gas for the cal
 
 Current implementation: **LIQFlashYul** (pure Yul, zero fees, USDC only)
 
-### Gas Breakdown (from Tenderly traces)
+### Verified Benchmark Results (from Tenderly E2E test)
 
-```
-Operation                                    Gas Cost (warm)
-─────────────────────────────────────────────────────────────
-USDC transfer out                            ~27,000 (proxy + implementation)
-Callback + repay                             ~5,000 (borrower's transfer back)
-balanceOf check                              ~2,500 (USDC staticcall)
-Protocol logic                               ~700 (dispatcher, storage, event)
-─────────────────────────────────────────────────────────────
-TOTAL (warm)                                 ~41,000
-```
+Run `npx tsx script/test-tenderly.ts` to reproduce these numbers.
 
-The ~40k warm gas is mostly USDC proxy overhead - unavoidable without a different token.
+| Operation | Gas Used (receipt) |
+|-----------|-------------------|
+| Flash loan (50k USDC, cold) | **83,998** |
+| Deposit | 90,148 |
+| Withdraw | 57,017 |
+| Top-up deposit | 55,948 |
+| Sync | 43,097 |
 
-### Benchmark Results (from Tenderly)
-
-| Metric | Cold | Warm |
-|--------|------|------|
-| Full flash loan TX | ~73,000 | ~41,000 |
-
-**Note**: "Warm" means repeated use where contracts are already deployed and borrower has existing USDC balance slot. "Cold" is first-time use with fresh state.
+**Methodology**: These are transaction receipt `gasUsed` values from Tenderly fork simulation. "Cold" means first flash loan with a freshly deployed MockBorrower (borrower's USDC balance slot starts at 0).
 
 ---
 
 ## Comparison Summary
 
-| Protocol | Cold Gas | Warm Gas | Fee |
-|----------|----------|----------|-----|
-| Aave V3 | ~120,000 | ~90,000 | 0.05% |
-| Balancer | ~110,000 | ~80,000 | 0% |
-| Morpho Blue | ~88,000 | ~68,500 | 0% |
-| Euler V2 | ~75,000 | ~55,000 | 0% |
-| **LIQ** | **~73,000** | **~41,000** | **0%** |
+| Protocol | LIQFlashYul | Balancer V2 (USDC) |
+|----------|-------------|---------------------|
+| Verified TX Gas (cold) | **83,998** | 86,268 (min observed) |
+| Fee Model | 0% (zero fee) | 0% |
+| Supported Tokens | USDC only | Multiple |
+| ERC-3156 Compliant | Yes | No (custom interface) |
 
-### Gas Savings vs Competitors
+### Key Observations
 
-| Comparison | LIQ Advantage |
-|------------|---------------|
-| LIQ vs Balancer (warm) | **~49% cheaper** (~39k gas saved) |
-| LIQ vs Morpho (warm) | **~40% cheaper** (~27.5k gas saved) |
-| LIQ vs Aave (warm) | **~54% cheaper** (~49k gas saved) |
+LIQFlashYul is **~2.6% cheaper** than Balancer V2's minimum observed USDC flash loan (83,998 vs 86,268 gas). Both protocols have comparable gas costs for minimal flash loans when measured on the same basis (transaction receipt `gasUsed`).
 
-### Why LIQ Beats Morpho/Euler
+The lender protocol overhead is a small fraction of total gas in real-world flash loan transactions, which are dominated by callback logic (arbitrage, swaps, liquidations).
 
-| Pattern | Callback | Protocol Verify | Total |
-|---------|----------|-----------------|-------|
-| **LIQ** (transfer + balanceOf) | ~5k | ~0.5k | **~5.5k** |
-| Morpho (approve + transferFrom) | ~23k | ~6k | ~29k |
+### LIQFlashYul Advantages
 
-LIQ's `transfer()` + `balanceOf()` pattern is **~5x more efficient** for repayment than the `approve()` + `transferFrom()` pattern used by Morpho.
-
-### Key Advantages
-
-**LIQFlashYul advantages:**
-- **Gas optimized**: 40-50% cheaper than competitors on warm calls
 - **Zero fees**: Bots keep 100% of profits
 - **ERC-3156 compliant**: Works with existing flash loan code
-- **Pure Yul**: Maximum gas optimization
-- **Simple**: USDC only (simplicity = efficiency)
+- **Pure Yul**: Maximum gas optimization, simple auditable codebase
+- **Single token focus**: USDC only (simplicity = efficiency)
+- **Efficient repayment pattern**: `transfer()` + `balanceOf()` instead of `approve()` + `transferFrom()`
 
-**Trade-offs:**
+### Trade-offs
+
 - Single token (USDC only) vs multi-token support
 - Smaller liquidity pool vs established protocols
 
 ### Note on Balancer Data
 
-The Balancer statistics above (min gas 86,268 for USDC) are from on-chain transaction receipts. The ~80k "warm" estimate in the comparison table is based on Tenderly simulations with equivalent borrower complexity to LIQ's test borrower.
+The Balancer minimum (86,268 gas for USDC) is from on-chain transaction receipts extracted via Envio HyperSync. This represents the simplest observed Balancer USDC flash loan callback. Average Balancer flash loans use ~747k gas due to complex callback logic (DEX swaps, liquidations, arbitrage).
 
 ---
 
