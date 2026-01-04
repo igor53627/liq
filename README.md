@@ -122,7 +122,7 @@ interface ILIQFlash {
 | Contract | Address | Etherscan |
 |----------|---------|-----------|
 | LIQFlashYul | `0xe9eb8a0f6328e243086fe6efee0857e14fa2cb87` | [View](https://etherscan.io/address/0xe9eb8a0f6328e243086fe6efee0857e14fa2cb87) |
-| TestBorrower | `0x53cddbcdee2dc2b756a25307f4810c609b28c3e7` | [View](https://etherscan.io/address/0x53cddbcdee2dc2b756a25307f4810c609b28c3e7) |
+| TestBorrower | `0x7e13a21ce933a7122a8d1bdf0aeced4ba48ecad6` | [View](https://etherscan.io/address/0x7e13a21ce933a7122a8d1bdf0aeced4ba48ecad6) |
 | USDC | `0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48` | [View](https://etherscan.io/address/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48) |
 
 Owner: `0xaF7EB1455e2939DF433042ba64d06D0Cb478B1c7`
@@ -163,7 +163,7 @@ npx tsx script/deploy-borrower.ts
 
 ## Gas Breakdown
 
-Verified transaction gas: **85,292** ([real mainnet tx](https://etherscan.io/tx/0x35274dd1af81d4424cfa35cadff05508a3148a72805730bfef8de9f6d686af5c))
+Verified transaction gas: **85,292** ([real mainnet tx](https://etherscan.io/tx/0x35274dd1af81d4424cfa35cadff05508a3148a72805730bfef8de9f6d686af5c) - using legacy TestBorrower)
 
 | Component | Estimated Gas | Notes |
 |-----------|---------------|-------|
