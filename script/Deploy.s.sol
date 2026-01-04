@@ -65,7 +65,7 @@ contract DeployLIQFlash is Script {
         console.log("   - Approve USDC first");
         console.log("   - Call deposit(amount)");
         console.log("");
-        console.log("3. Update webapp/index.html with LIQ_ADDRESS:");
+        console.log("3. Update docs/index.html with LIQ_ADDRESS:");
         console.log("   const LIQ_ADDRESS = '", address(liq), "';");
         console.log("");
         console.log("4. Optional: Transfer ownership to multisig");

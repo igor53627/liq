@@ -348,7 +348,7 @@ async function main() {
   console.log("   - Approve USDC: usdc.approve(liq, amount)");
   console.log("   - Deposit:      liq.deposit(amount)");
   console.log("");
-  console.log("3. Update webapp/index.html:");
+  console.log("3. Update docs/index.html:");
   console.log(`   const LIQ_ADDRESS = '${contractAddress}';`);
   console.log("");
   console.log("4. Optional: Transfer ownership to multisig");
