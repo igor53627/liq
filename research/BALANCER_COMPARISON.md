@@ -82,33 +82,57 @@ This indicates real-world flash loans include at minimum ~40-55k gas for the cal
 
 ---
 
-## LIQ Protocol Gas Costs
+## LIQFlashYul Gas Costs
 
-| Version | Gas (warm) | Fee |
-|---------|------------|-----|
-| LIQFlashV2 (Free) | 5,166 | 0 |
-| LIQFlashFinal (Dual) | 5,200 - 7,500 | 0 |
-| LIQFlashPaid | 7,284 | 1 LIQ flat |
+Current implementation: **LIQFlashYul** (pure Yul, zero fees, USDC only)
+
+### Gas Breakdown (from forge test traces)
+
+```
+Operation                                    Gas Cost (warm)
+─────────────────────────────────────────────────────────────
+Reentrancy guard check (SLOAD slot 2)        ~100
+poolBalance check (SLOAD slot 1)             ~100
+USDC transfer to borrower                    ~28,152
+Callback (onFlashLoan)                       ~2,212 (excl. repay)
+  └─ Repayment transfer inside callback      ~5,452
+balanceOf verification                       ~1,339
+Reentrancy guard unlock (SSTORE)             ~100
+Event emission                               ~375
+─────────────────────────────────────────────────────────────
+TOTAL flashLoan() execution                  ~60,133
+Full TX (via MockBorrower.borrow)            ~62,846
+```
+
+### Benchmark Results
+
+| Metric | Cold | Warm |
+|--------|------|------|
+| Full flash loan TX (via borrower) | 90,858 | 62,846 |
+| LIQFlashYul::flashLoan() only | 79,133 | 60,133 |
 
 ---
 
 ## Comparison Summary
 
-| Metric | LIQ Free | LIQ Paid | Balancer V2 |
-|--------|----------|----------|-------------|
-| Protocol Overhead | 5,166 | 7,284 | ~28,500 |
-| Min Real TX Gas | ~5,200 | ~7,300 | 71,527 |
-| Token Transfers | None (virtual) | 2 SSTORE | 2 safeTransfer |
-| Fee Model | 0 | 1 LIQ flat | 0% |
-| ReentrancyGuard | No | No | Yes |
+| Metric | LIQFlashYul | Balancer V2 |
+|--------|-------------|-------------|
+| Full TX Gas (warm) | 62,846 | 71,527 (WETH min) |
+| Full TX Gas (USDC, warm) | 62,846 | 86,268 (USDC min) |
+| Fee Model | 0% (zero fee) | 0% |
+| Supported Tokens | USDC only | Multiple |
+| ReentrancyGuard | Yes (optimized) | Yes |
+| ERC-3156 Compliant | Yes | No (custom interface) |
 
-### Gas Savings
+### Gas Savings vs Balancer V2
 
 | Comparison | LIQ Advantage |
 |------------|---------------|
-| LIQ Free vs Balancer overhead | **5.5x cheaper** |
-| LIQ Paid vs Balancer overhead | **3.9x cheaper** |
-| LIQ Free vs Balancer min TX | **13.8x cheaper** |
+| LIQFlashYul vs Balancer WETH min | **1.14x cheaper** (8,681 gas saved) |
+| LIQFlashYul vs Balancer USDC min | **1.37x cheaper** (23,422 gas saved) |
+| LIQFlashYul vs Balancer USDC avg | **11.9x cheaper** (684,330 gas saved) |
+
+**Note**: The comparison uses minimum observed Balancer gas (simplest callback) for fairness. Real-world savings are typically much higher since average Balancer flash loans use ~747k gas for USDC.
 
 ---
 
@@ -130,6 +154,10 @@ This indicates real-world flash loans include at minimum ~40-55k gas for the cal
 ## Reproduction
 
 ```bash
-source ~/.zsh_secrets  # Contains ENVIO_API_KEY
-python3 extract_all_flashloans.py
+# Run gas benchmark
+forge test --match-test testGasBenchmark --fork-url https://ethereum-rpc.publicnode.com -vvv
+
+# Run full E2E test on Tenderly (requires TENDERLY_ACCESS_KEY)
+source ~/.zsh_secrets
+npx tsx script/test-tenderly.ts
 ```
