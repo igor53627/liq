@@ -2,11 +2,15 @@
 
 ## Audit Status
 
-**NOT AUDITED** - Use at your own risk.
+**AUDITED** - AuditAgent scan completed January 4, 2026 (Scan ID: 26).
+
+See [audits/](audits/) directory for full reports.
 
 ## Security Contact
 
-Report vulnerabilities to: security@liq.protocol
+Report vulnerabilities via [GitHub Issues](https://github.com/igor53627/liq/issues) with the `security` label.
+
+For sensitive disclosures, use [GitHub's private vulnerability reporting](https://github.com/igor53627/liq/security/advisories/new).
 
 ## Known Security Considerations
 
@@ -35,15 +39,16 @@ Report vulnerabilities to: security@liq.protocol
 
 **Design Decision**: `poolBalance` is tracked in storage instead of calling `balanceOf()` before each loan.
 
-**Invariant**: `poolBalance` must always equal actual USDC balance.
+**Invariant**: `poolBalance` should equal actual USDC balance.
 
 **Maintained by**:
 - `deposit()`: poolBalance += amount
 - `withdraw()`: poolBalance -= amount
 - Flash loan: verified via `balanceOf() >= poolBalance` after callback
 - Reentrancy guard: prevents deposit/withdraw during callback
+- `sync()`: owner can call to set poolBalance = actual balance
 
-**Risk**: If someone sends USDC directly to contract (not via deposit), poolBalance will be less than actual balance. This is safe - it just means extra USDC is locked until owner withdraws.
+**KNOWN RISK - Excess USDC Extraction**: If someone sends USDC directly to the contract (not via deposit), the excess can be extracted by anyone via flash loan. The repayment check only verifies `finalBalance >= poolBalance`, so an attacker can borrow the full poolBalance, keep the excess, and repay only enough to satisfy the check. The owner should call `sync()` immediately after any direct transfers, but this is vulnerable to front-running. See [audit findings](audits/) for details.
 
 ### 4. Reentrancy Guard
 
