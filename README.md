@@ -16,16 +16,15 @@
 
 ## Gas Comparison
 
-| Protocol | Cold Gas | Warm Gas | Fee |
-|----------|----------|----------|-----|
-| Aave V3 | ~120,000 | ~90,000 | 0.05% |
-| Balancer | ~110,000 | ~80,000 | 0% |
-| Morpho Blue | ~88,000 | ~68,500 | 0% |
-| Euler V2 | ~75,000 | ~55,000 | 0% |
-| **LIQ** | **~73,000** | **~41,000** | **0%** |
+| Protocol | Gas (receipt) | Fee | Source |
+|----------|---------------|-----|--------|
+| Aave V3 | ~120,000 | 0.05% | Estimated |
+| Balancer | 86,268 (min) | 0% | On-chain data |
+| Morpho Blue | ~88,000 | 0% | Estimated |
+| Euler V2 | ~75,000 | 0% | Estimated |
+| **LIQ** | **85,292** | **0%** | [Verified tx](https://etherscan.io/tx/0x35274dd1af81d4424cfa35cadff05508a3148a72805730bfef8de9f6d686af5c) |
 
-- **Warm (repeated use):** LIQ is 40% cheaper than Morpho, 50%+ cheaper than Aave/Balancer
-- **Cold (first use):** LIQ matches or beats all competitors
+LIQ and Balancer have comparable gas costs (~85k vs ~86k). The main advantage of LIQ is **zero fees** and **ERC-3156 compatibility**.
 
 ## Features
 
@@ -164,25 +163,28 @@ npx tsx script/deploy-borrower.ts
 
 ## Gas Breakdown
 
-Total warm gas: **~41,000**
+Verified transaction gas: **85,292** ([real mainnet tx](https://etherscan.io/tx/0x35274dd1af81d4424cfa35cadff05508a3148a72805730bfef8de9f6d686af5c))
 
-| Component | Gas | Notes |
-|-----------|-----|-------|
-| USDC transfer out | ~27,000 | Proxy + implementation (warm) |
-| Callback + repay | ~5,000 | Borrower's transfer back |
+| Component | Estimated Gas | Notes |
+|-----------|---------------|-------|
+| Intrinsic tx cost | ~21,000 | Base transaction cost |
+| USDC transfer out | ~27,000 | Proxy + implementation |
+| Callback + repay | ~27,000 | Borrower's transfer back |
 | balanceOf check | ~2,500 | USDC staticcall |
-| Protocol logic | ~700 | Dispatcher, storage, event, return |
+| Protocol logic | ~700 | Dispatcher, storage, event |
 
-The ~40k is mostly USDC proxy overhead - unavoidable without a different token.
+Most gas is spent on USDC transfers (proxy overhead) - unavoidable without a different token.
 
-### Why LIQ beats Morpho/Euler
+### LIQ Repayment Pattern
 
-| Pattern | Callback | Protocol Verify | Total |
-|---------|----------|-----------------|-------|
-| **LIQ** (transfer + balanceOf) | ~5k | ~0.5k | **~5.5k** |
-| Morpho (approve + transferFrom) | ~23k | ~6k | ~29k |
+LIQ uses `transfer()` + `balanceOf()` instead of `approve()` + `transferFrom()`:
 
-LIQ's `transfer()` + `balanceOf()` pattern is **~5x more efficient** for repayment than the `approve()` + `transferFrom()` pattern used by Morpho.
+| Pattern | Description |
+|---------|-------------|
+| **LIQ** | Borrower calls `USDC.transfer(lender, amount)`, lender verifies via `balanceOf()` |
+| **Others** | Borrower calls `USDC.approve()`, lender calls `transferFrom()` |
+
+The `transfer()` + `balanceOf()` pattern saves one external call compared to `approve()` + `transferFrom()`.
 
 ## FAQ
 

@@ -82,33 +82,53 @@ This indicates real-world flash loans include at minimum ~40-55k gas for the cal
 
 ---
 
-## LIQ Protocol Gas Costs
+## LIQFlashYul Gas Costs
 
-| Version | Gas (warm) | Fee |
-|---------|------------|-----|
-| LIQFlashV2 (Free) | 5,166 | 0 |
-| LIQFlashFinal (Dual) | 5,200 - 7,500 | 0 |
-| LIQFlashPaid | 7,284 | 1 LIQ flat |
+Current implementation: **LIQFlashYul** (pure Yul, zero fees, USDC only)
+
+### Verified Gas (from real mainnet transaction)
+
+| Source | Gas Used (receipt) |
+|--------|-------------------|
+| [Real mainnet tx](https://etherscan.io/tx/0x35274dd1af81d4424cfa35cadff05508a3148a72805730bfef8de9f6d686af5c) | **85,292** |
+| Tenderly simulation (fresh borrower) | 83,988 |
+| Tenderly simulation (deployed borrower) | 85,292 |
+
+**Methodology**: These are transaction receipt `gasUsed` values. The real mainnet tx is the authoritative measurement.
 
 ---
 
 ## Comparison Summary
 
-| Metric | LIQ Free | LIQ Paid | Balancer V2 |
-|--------|----------|----------|-------------|
-| Protocol Overhead | 5,166 | 7,284 | ~28,500 |
-| Min Real TX Gas | ~5,200 | ~7,300 | 71,527 |
-| Token Transfers | None (virtual) | 2 SSTORE | 2 safeTransfer |
-| Fee Model | 0 | 1 LIQ flat | 0% |
-| ReentrancyGuard | No | No | Yes |
+| Protocol | LIQFlashYul | Balancer V2 (USDC) |
+|----------|-------------|---------------------|
+| Verified TX Gas | **85,292** | 86,268 (min observed) |
+| Fee Model | 0% (zero fee) | 0% |
+| Supported Tokens | USDC only | Multiple |
+| ERC-3156 Compliant | Yes | No (custom interface) |
 
-### Gas Savings
+### Key Observations
 
-| Comparison | LIQ Advantage |
-|------------|---------------|
-| LIQ Free vs Balancer overhead | **5.5x cheaper** |
-| LIQ Paid vs Balancer overhead | **3.9x cheaper** |
-| LIQ Free vs Balancer min TX | **13.8x cheaper** |
+LIQFlashYul is **~1.1% cheaper** than Balancer V2's minimum observed USDC flash loan (85,292 vs 86,268 gas). Both protocols have comparable gas costs for minimal flash loans when measured on the same basis (transaction receipt `gasUsed`).
+
+The lender protocol overhead is a small fraction of total gas in real-world flash loan transactions, which are dominated by callback logic (arbitrage, swaps, liquidations).
+
+### LIQFlashYul Advantages
+
+- **Zero fees**: Bots keep 100% of profits
+- **ERC-3156 compliant**: Works with existing flash loan code
+- **Pure Yul**: Maximum gas optimization, simple auditable codebase
+- **Single token focus**: USDC only (simplicity = efficiency)
+- **Efficient repayment pattern**: `transfer()` + `balanceOf()` instead of `approve()` + `transferFrom()`
+
+### Trade-offs
+
+- Single token (USDC only) vs multi-token support
+- Smaller liquidity pool vs established protocols
+
+### Note on Balancer Data
+
+The Balancer minimum (86,268 gas for USDC) is from on-chain transaction receipts extracted via Envio HyperSync. This represents the simplest observed Balancer USDC flash loan callback. Average Balancer flash loans use ~747k gas due to complex callback logic (DEX swaps, liquidations, arbitrage).
 
 ---
 
@@ -130,6 +150,10 @@ This indicates real-world flash loans include at minimum ~40-55k gas for the cal
 ## Reproduction
 
 ```bash
-source ~/.zsh_secrets  # Contains ENVIO_API_KEY
-python3 extract_all_flashloans.py
+# Run gas benchmark
+forge test --match-test testGasBenchmark --fork-url https://ethereum-rpc.publicnode.com -vvv
+
+# Run full E2E test on Tenderly (requires TENDERLY_ACCESS_KEY)
+source ~/.zsh_secrets
+npx tsx script/test-tenderly.ts
 ```
