@@ -1,0 +1,66 @@
+# Audit Responses
+
+This document tracks responses to audit findings that are either false positives, acknowledged design decisions, or out of scope.
+
+## AuditAgent Report - January 4, 2026 (Scan ID: 26)
+
+### False Positives / Scanner Misunderstandings
+
+**Finding #4: Unsafe Return Statement In Yul Block** - FALSE POSITIVE
+- The `return(0x00, 0x20)` statements in Yul are intentional and correct
+- They are used in deliberate branches with no intended fallthrough
+- This is standard Yul pattern for returning values from function selectors
+
+**Finding #12: Unused State Variable** - FALSE POSITIVE
+- The `locked` and `USDC` variables are declared for storage layout/ABI purposes
+- They are accessed via Yul assembly using slot numbers, not Solidity variable names
+- The scanner doesn't recognize Yul-based access patterns
+
+### Acknowledged Design Decisions
+
+**Finding #5: Non-Specific Solidity Pragma Version** - ACKNOWLEDGED
+- Using `^0.8.20` is acceptable as Foundry pins the compiler version
+- Risk is mitigated by CI testing with specific compiler version
+
+**Finding #6: PUSH0 Opcode Compatibility Issue** - ACKNOWLEDGED
+- Contract is deployed only on Ethereum mainnet which supports Shanghai
+- L2 deployment is not planned; if needed, would require recompilation
+
+**Finding #9: ERC-3156 non-compliance (callback return value)** - ACKNOWLEDGED
+- Intentional gas optimization, documented in SECURITY.md
+- Balance check provides equivalent security guarantee
+- Documentation updated to clarify "ERC-3156 compatible (except callback return value verification)"
+
+**Finding #10: Permissionless deposit() has no depositor accounting** - ACKNOWLEDGED
+- This is the intended design - deposits are effectively donations to the pool
+- Owner controls all withdrawals
+- Documented in README and SECURITY.md
+
+**Finding #11: High Function Complexity** - ACKNOWLEDGED
+- The fallback() function handles multiple selectors in Yul for gas optimization
+- Complexity is inherent to the selector-dispatch pattern
+- Well-documented and tested
+
+**Finding #15: No mechanism to rescue non-USDC tokens** - ACKNOWLEDGED
+- Contract is USDC-only by design
+- Adding rescue function would increase attack surface
+- Users should not send non-USDC tokens to the contract
+
+### Out of Scope (Example/Test Code)
+
+**Finding #1: TestBorrower arbitrary lender injection** - TRACKED AS ISSUE #19
+- Real vulnerability but in example/test contract, not production code
+- Created issue to harden the example for safety of integrators who may copy it
+
+**Finding #7: Unsafe ERC20 Operation Usage (TestBorrower)** - OUT OF SCOPE
+- TestBorrower is example code, not production
+- Would be fixed as part of Issue #19
+
+### Real Issues - Tracked as GitHub Issues
+
+| Finding | Severity | Issue |
+|---------|----------|-------|
+| #2/#3: Excess USDC extraction | Medium | [#18](https://github.com/igor53627/liq/issues/18) |
+| #1: TestBorrower lender injection | High (example code) | [#19](https://github.com/igor53627/liq/issues/19) |
+| #8: Missing ERC20 return value checks | Info | [#20](https://github.com/igor53627/liq/issues/20) |
+| #13/#14: Missing events | Best Practices | [#21](https://github.com/igor53627/liq/issues/21) |
