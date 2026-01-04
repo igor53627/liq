@@ -4,15 +4,16 @@
 
 ## Gas Comparison
 
-| Protocol | Warm Gas | Fee | Notes |
-|----------|----------|-----|-------|
-| Aave V3 | ~90,000 | 0.05% | Complex risk checks |
-| Balancer | ~80,000 | 0% | Multi-token pool overhead |
-| Morpho Blue | ~68,500 | 0% | Minimal but uses approve pattern |
-| Euler V2 | ~55,000 | 0% | EVC auth layer overhead |
-| **LIQ** | **~41,000** | **0%** | **Pure Yul, transfer pattern** |
+| Protocol | Cold Gas | Warm Gas | Fee |
+|----------|----------|----------|-----|
+| Aave V3 | ~120,000 | ~90,000 | 0.05% |
+| Balancer | ~110,000 | ~80,000 | 0% |
+| Morpho Blue | ~88,000 | ~68,500 | 0% |
+| Euler V2 | ~75,000 | ~55,000 | 0% |
+| **LIQ** | **~73,000** | **~41,000** | **0%** |
 
-LIQ is **40% cheaper** than Morpho and **50%+ cheaper** than Aave/Balancer.
+- **Warm (repeated use):** LIQ is 40% cheaper than Morpho, 50%+ cheaper than Aave/Balancer
+- **Cold (first use):** LIQ matches or beats all competitors
 
 ## Features
 
