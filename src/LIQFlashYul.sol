@@ -112,7 +112,7 @@ contract LIQFlashYul {
             //------------------------------------------------------
             if eq(sel, 0x5cffe9de) {
                 // Reentrancy guard - prevents poolBalance desync via callback
-                if sload(2) { revert(0, 0) }  // LOCKED
+                if sload(2) { revert(0, 0) } // LOCKED
                 sstore(2, 1)
 
                 // Cache calldata values (saves ~6 gas per reuse)
@@ -122,7 +122,7 @@ contract LIQFlashYul {
 
                 // Enforce token == USDC (ERC-3156 compliance)
                 if iszero(eq(token, 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48)) {
-                    revert(0, 0)  // UNSUPPORTED_TOKEN
+                    revert(0, 0) // UNSUPPORTED_TOKEN
                 }
 
                 // Load poolBalance for borrow cap and repayment check
@@ -130,7 +130,7 @@ contract LIQFlashYul {
 
                 // Prevent borrowing more than tracked pool
                 if gt(amount, poolBal) {
-                    revert(0, 0)  // AMOUNT_EXCEEDS_POOL
+                    revert(0, 0) // AMOUNT_EXCEEDS_POOL
                 }
 
                 // Transfer USDC to receiver
@@ -146,17 +146,17 @@ contract LIQFlashYul {
                 // onFlashLoan(address initiator, address token, uint256 amount, uint256 fee, bytes data)
                 // Selector: 0x23e30c8b
                 mstore(0x100, 0x23e30c8b00000000000000000000000000000000000000000000000000000000)
-                mstore(0x104, caller())           // initiator = msg.sender
-                mstore(0x124, 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48)  // token = USDC
-                mstore(0x144, amount)             // amount
-                mstore(0x164, 0)                  // fee = 0 (zero fee flash loans)
-                mstore(0x184, 0xa0)               // data offset (160 bytes from start)
+                mstore(0x104, caller()) // initiator = msg.sender
+                mstore(0x124, 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48) // token = USDC
+                mstore(0x144, amount) // amount
+                mstore(0x164, 0) // fee = 0 (zero fee flash loans)
+                mstore(0x184, 0xa0) // data offset (160 bytes from start)
 
                 // Copy bytes data from calldata to memory
                 let dataOffset := add(calldataload(0x64), 0x04)
                 let dataLen := calldataload(dataOffset)
-                mstore(0x1a4, dataLen)            // data.length
-                calldatacopy(0x1c4, add(dataOffset, 0x20), dataLen)  // data bytes
+                mstore(0x1a4, dataLen) // data.length
+                calldatacopy(0x1c4, add(dataOffset, 0x20), dataLen) // data bytes
 
                 // Call receiver.onFlashLoan(...)
                 // Return value not checked - balance verification is sufficient
@@ -172,14 +172,15 @@ contract LIQFlashYul {
                     revert(0, 0)
                 }
                 if lt(mload(0x00), poolBal) {
-                    revert(0, 0)  // NOT_REPAID
+                    revert(0, 0) // NOT_REPAID
                 }
 
                 // Emit FlashLoan(receiver, token, amount)
                 // topic0 = keccak256("FlashLoan(address,address,uint256)") = 0xc76f1b4f...
                 mstore(0x00, amount)
                 log3(
-                    0x00, 0x20,
+                    0x00,
+                    0x20,
                     0xc76f1b4fe4396ac07a9fa55a415d4ca430e72651d37d3401f3bed7cb13fc4f12,
                     receiver,
                     0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
@@ -207,7 +208,7 @@ contract LIQFlashYul {
                     mstore(0x00, 0)
                     return(0x00, 0x20)
                 }
-                mstore(0x00, sload(1))  // poolBalance
+                mstore(0x00, sload(1)) // poolBalance
                 return(0x00, 0x20)
             }
 
@@ -223,7 +224,7 @@ contract LIQFlashYul {
                 let token := calldataload(0x04)
                 // Revert for unsupported tokens (ERC-3156 spec)
                 if iszero(eq(token, 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48)) {
-                    revert(0, 0)  // UNSUPPORTED_TOKEN
+                    revert(0, 0) // UNSUPPORTED_TOKEN
                 }
                 mstore(0x00, 0)
                 return(0x00, 0x20)
@@ -240,7 +241,7 @@ contract LIQFlashYul {
             //------------------------------------------------------
             if eq(sel, 0xb6b55f25) {
                 // Reentrancy guard - prevent deposit during flashLoan callback
-                if sload(2) { revert(0, 0) }  // LOCKED
+                if sload(2) { revert(0, 0) } // LOCKED
 
                 let amt := calldataload(0x04)
 
@@ -268,13 +269,13 @@ contract LIQFlashYul {
             //------------------------------------------------------
             if eq(sel, 0x2e1a7d4d) {
                 // Reentrancy guard - prevent withdraw during flashLoan callback
-                if sload(2) { revert(0, 0) }  // LOCKED
+                if sload(2) { revert(0, 0) } // LOCKED
 
                 let c := caller()
 
                 // Owner check (slot 0)
                 if iszero(eq(c, sload(0))) {
-                    revert(0, 0)  // NOT_OWNER
+                    revert(0, 0) // NOT_OWNER
                 }
 
                 let amt := calldataload(0x04)
@@ -282,7 +283,7 @@ contract LIQFlashYul {
 
                 // Underflow protection: revert if amt > poolBalance
                 if gt(amt, currentBal) {
-                    revert(0, 0)  // INSUFFICIENT_BALANCE
+                    revert(0, 0) // INSUFFICIENT_BALANCE
                 }
 
                 // Update poolBalance first (slot 1)
@@ -308,11 +309,11 @@ contract LIQFlashYul {
             //------------------------------------------------------
             if eq(sel, 0xfff6cae9) {
                 // Reentrancy guard - prevent sync during flashLoan callback
-                if sload(2) { revert(0, 0) }  // LOCKED
+                if sload(2) { revert(0, 0) } // LOCKED
 
                 // Owner check (slot 0)
                 if iszero(eq(caller(), sload(0))) {
-                    revert(0, 0)  // NOT_OWNER
+                    revert(0, 0) // NOT_OWNER
                 }
 
                 // Get actual USDC balance
