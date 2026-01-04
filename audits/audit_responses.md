@@ -41,10 +41,22 @@ This document tracks responses to audit findings that are either false positives
 - Complexity is inherent to the selector-dispatch pattern
 - Well-documented and tested
 
+**Finding #13/#14: Missing events for critical operations** - ACKNOWLEDGED (Issue #21 closed)
+- Events were intentionally omitted to save gas in the Yul implementation
+- This is a core design choice for the gas-optimized flash loan protocol
+- Flash loans DO emit a `FlashLoan` event; only admin functions omit events
+- Users can track deposits/withdrawals via USDC Transfer events
+
 **Finding #15: No mechanism to rescue non-USDC tokens** - ACKNOWLEDGED
 - Contract is USDC-only by design
 - Adding rescue function would increase attack surface
 - Users should not send non-USDC tokens to the contract
+
+**Finding #8: Missing ERC20 return value checks** - FUTURE VERSION (Issue #20 closed)
+- Valid concern for a future redeployment
+- Current contract relies on USDC reverting on transfer failure (current behavior)
+- Since contract is stateless (poolBalance can be re-synced via `sync()`), redeployment is low-friction
+- For next version: add `if iszero(mload(0x00)) { revert(0, 0) }` after ERC20 calls
 
 ### Out of Scope (Example/Test Code)
 
@@ -65,10 +77,11 @@ This document tracks responses to audit findings that are either false positives
 - If someone accidentally sends USDC directly, the owner can call `sync()` to claim it
 - Any excess USDC may be extracted via flash loan before `sync()` is called - this is accepted behavior
 
-### Real Issues - Tracked as GitHub Issues
+### Summary - All Issues Resolved
 
 | Finding | Severity | Issue | Status |
 |---------|----------|-------|--------|
-| #1: TestBorrower lender injection | High (example code) | [#19](https://github.com/igor53627/liq/issues/19) | Fixed in this PR |
-| #8: Missing ERC20 return value checks | Info | [#20](https://github.com/igor53627/liq/issues/20) | Open |
-| #13/#14: Missing events | Best Practices | [#21](https://github.com/igor53627/liq/issues/21) | Open |
+| #2/#3: Excess USDC extraction | Medium | [#18](https://github.com/igor53627/liq/issues/18) | Closed - Design decision |
+| #1: TestBorrower lender injection | High (example code) | [#19](https://github.com/igor53627/liq/issues/19) | Fixed in PR #22 |
+| #8: Missing ERC20 return value checks | Info | [#20](https://github.com/igor53627/liq/issues/20) | Closed - Future version |
+| #13/#14: Missing events | Best Practices | [#21](https://github.com/igor53627/liq/issues/21) | Closed - Gas optimization |
