@@ -200,7 +200,7 @@ ERC-3156 specifies that borrowers should return `keccak256("ERC3156FlashBorrower
 
 **What happens if someone sends USDC directly to the contract?**
 
-Direct transfers increase the actual balance but not `poolBalance`. This excess USDC cannot be borrowed (flash loans are capped at `poolBalance`). The owner can call `sync()` to update `poolBalance` to match the actual balance, making the excess available for flash loans.
+Direct transfers increase the actual balance but not `poolBalance`. **Warning: This excess USDC can be extracted by anyone via flash loan.** The repayment check only verifies `balanceAfter >= poolBalance`, so a borrower can effectively keep the excess by repaying less than borrowed. The owner should call `sync()` immediately after any direct transfer to protect excess funds by updating `poolBalance` to match the actual balance.
 
 ## Security
 
