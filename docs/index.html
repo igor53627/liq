@@ -512,13 +512,6 @@
         const depositPanel = document.getElementById('depositPanel');
         const withdrawPanel = document.getElementById('withdrawPanel');
 
-        // Escape HTML to prevent XSS
-        function escapeHtml(str) {
-            const div = document.createElement('div');
-            div.textContent = str;
-            return div.innerHTML;
-        }
-
         // Logging
         function log(message, type = 'info') {
             const time = new Date().toLocaleTimeString();
@@ -569,6 +562,14 @@
                             method: 'wallet_switchEthereumChain',
                             params: [{ chainId: '0x1' }],
                         });
+                        // Re-verify the chain ID after switch
+                        const newChainIdHex = await window.ethereum.request({ method: 'eth_chainId' });
+                        const newChainId = parseInt(newChainIdHex, 16);
+                        if (newChainId !== MAINNET_CHAIN_ID) {
+                            log('Still on wrong network after switch attempt', 'error');
+                            return;
+                        }
+                        log('Successfully switched to Ethereum Mainnet', 'success');
                     } catch (switchErr) {
                         log('Failed to switch network', 'error');
                         return;
