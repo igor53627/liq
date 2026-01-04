@@ -89,7 +89,7 @@ Current implementation: **LIQFlashYul** (pure Yul, zero fees, USDC only)
 ### Gas Breakdown (from forge test traces)
 
 ```
-Operation                                    Gas Cost (warm)
+Operation                                    Gas Cost (in-test)
 ─────────────────────────────────────────────────────────────
 Reentrancy guard check (SLOAD slot 2)        ~100
 poolBalance check (SLOAD slot 1)             ~100
@@ -100,39 +100,47 @@ balanceOf verification                       ~1,339
 Reentrancy guard unlock (SSTORE)             ~100
 Event emission                               ~375
 ─────────────────────────────────────────────────────────────
-TOTAL flashLoan() execution                  ~60,133
-Full TX (via MockBorrower.borrow)            ~62,846
+TOTAL flashLoan() execution (in-test)        ~60,133
 ```
 
-### Benchmark Results
+### Benchmark Results (Foundry gasleft() delta)
 
 | Metric | Cold | Warm |
 |--------|------|------|
-| Full flash loan TX (via borrower) | 90,858 | 62,846 |
-| LIQFlashYul::flashLoan() only | 79,133 | 60,133 |
+| In-test call gas (via borrower) | 90,858 | 62,846 |
+
+**Important**: These numbers are `gasleft()` deltas from Foundry tests, which do NOT include the 21,000 intrinsic transaction gas or calldata costs. Real mainnet transaction `gasUsed` would be approximately 85,000-90,000 gas for a minimal borrow+repay flow.
 
 ---
 
 ## Comparison Summary
 
-| Metric | LIQFlashYul | Balancer V2 |
-|--------|-------------|-------------|
-| Full TX Gas (warm) | 62,846 | 71,527 (WETH min) |
-| Full TX Gas (USDC, warm) | 62,846 | 86,268 (USDC min) |
+| Metric | LIQFlashYul | Balancer V2 (USDC) |
+|--------|-------------|---------------------|
+| Estimated TX Gas (minimal callback) | ~85,000-90,000 | 86,268 (observed min) |
 | Fee Model | 0% (zero fee) | 0% |
 | Supported Tokens | USDC only | Multiple |
-| ReentrancyGuard | Yes (optimized) | Yes |
+| ReentrancyGuard | Yes | Yes |
 | ERC-3156 Compliant | Yes | No (custom interface) |
 
-### Gas Savings vs Balancer V2
+### Key Observations
 
-| Comparison | LIQ Advantage |
-|------------|---------------|
-| LIQFlashYul vs Balancer WETH min | **1.14x cheaper** (8,681 gas saved) |
-| LIQFlashYul vs Balancer USDC min | **1.37x cheaper** (23,422 gas saved) |
-| LIQFlashYul vs Balancer USDC avg | **11.9x cheaper** (684,330 gas saved) |
+LIQFlashYul and Balancer V2 have **comparable gas costs** for minimal USDC flash loans when measured on the same basis (transaction receipt `gasUsed`). The lender protocol overhead is a small fraction of total gas in real-world flash loan transactions, which are dominated by callback logic (arbitrage, swaps, liquidations).
 
-**Note**: The comparison uses minimum observed Balancer gas (simplest callback) for fairness. Real-world savings are typically much higher since average Balancer flash loans use ~747k gas for USDC.
+**LIQFlashYul advantages over Balancer V2:**
+- ERC-3156 compliant interface (standard borrower contract compatibility)
+- Zero fees (Balancer also has 0% fees, but this is configurable)
+- Simpler, auditable codebase (USDC-only, pure Yul)
+- Optimized for single-token USDC flash loans
+
+**Balancer V2 advantages:**
+- Multi-token support (any token in Balancer pools)
+- Battle-tested with billions in volume
+- Larger liquidity pools
+
+### Note on Average Gas Comparison
+
+The average Balancer USDC flash loan uses ~747,000 gas, but this is dominated by callback logic (DEX swaps, liquidations, arbitrage), not protocol overhead. Comparing LIQ's minimal test callback to Balancer's real-world complex callbacks is not meaningful for evaluating lender efficiency.
 
 ---
 
