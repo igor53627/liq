@@ -86,19 +86,15 @@ This indicates real-world flash loans include at minimum ~40-55k gas for the cal
 
 Current implementation: **LIQFlashYul** (pure Yul, zero fees, USDC only)
 
-### Verified Benchmark Results (from Tenderly E2E test)
+### Verified Gas (from real mainnet transaction)
 
-Run `npx tsx script/test-tenderly.ts` to reproduce these numbers.
+| Source | Gas Used (receipt) |
+|--------|-------------------|
+| [Real mainnet tx](https://etherscan.io/tx/0x35274dd1af81d4424cfa35cadff05508a3148a72805730bfef8de9f6d686af5c) | **85,292** |
+| Tenderly simulation (fresh borrower) | 83,988 |
+| Tenderly simulation (deployed borrower) | 85,292 |
 
-| Operation | Gas Used (receipt) |
-|-----------|-------------------|
-| Flash loan (50k USDC, cold) | **83,998** |
-| Deposit | 90,148 |
-| Withdraw | 57,017 |
-| Top-up deposit | 55,948 |
-| Sync | 43,097 |
-
-**Methodology**: These are transaction receipt `gasUsed` values from Tenderly fork simulation. "Cold" means first flash loan with a freshly deployed MockBorrower (borrower's USDC balance slot starts at 0).
+**Methodology**: These are transaction receipt `gasUsed` values. The real mainnet tx is the authoritative measurement.
 
 ---
 
@@ -106,14 +102,14 @@ Run `npx tsx script/test-tenderly.ts` to reproduce these numbers.
 
 | Protocol | LIQFlashYul | Balancer V2 (USDC) |
 |----------|-------------|---------------------|
-| Verified TX Gas (cold) | **83,998** | 86,268 (min observed) |
+| Verified TX Gas | **85,292** | 86,268 (min observed) |
 | Fee Model | 0% (zero fee) | 0% |
 | Supported Tokens | USDC only | Multiple |
 | ERC-3156 Compliant | Yes | No (custom interface) |
 
 ### Key Observations
 
-LIQFlashYul is **~2.6% cheaper** than Balancer V2's minimum observed USDC flash loan (83,998 vs 86,268 gas). Both protocols have comparable gas costs for minimal flash loans when measured on the same basis (transaction receipt `gasUsed`).
+LIQFlashYul is **~1.1% cheaper** than Balancer V2's minimum observed USDC flash loan (85,292 vs 86,268 gas). Both protocols have comparable gas costs for minimal flash loans when measured on the same basis (transaction receipt `gasUsed`).
 
 The lender protocol overhead is a small fraction of total gas in real-world flash loan transactions, which are dominated by callback logic (arbitrage, swaps, liquidations).
 
