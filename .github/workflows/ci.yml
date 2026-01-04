@@ -30,9 +30,7 @@ jobs:
         run: forge fmt --check
 
       - name: Run Forge tests
-        run: forge test -vvv
-        env:
-          FOUNDRY_FORK_URL: https://ethereum-rpc.publicnode.com
+        run: forge test --fork-url https://ethereum-rpc.publicnode.com -vvv
 
   typescript:
     name: TypeScript Check
@@ -49,4 +47,4 @@ jobs:
         run: npm install
 
       - name: TypeScript check
-        run: npx tsc --noEmit --skipLibCheck
+        run: npx --yes -p typescript tsc --noEmit --skipLibCheck
