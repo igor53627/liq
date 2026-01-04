@@ -56,11 +56,19 @@ This document tracks responses to audit findings that are either false positives
 - TestBorrower is example code, not production
 - Would be fixed as part of Issue #19
 
+### Acknowledged Design Decisions (Additional)
+
+**Finding #2/#3: Excess USDC extraction via flash loan** - ACKNOWLEDGED (Issue #18 closed)
+- The owner deposits USDC via `deposit()`, not by sending USDC directly to the contract
+- This design saves gas by avoiding an extra balance check
+- In normal operation, there should never be excess USDC (actualBalance > poolBalance)
+- If someone accidentally sends USDC directly, the owner can call `sync()` to claim it
+- Any excess USDC may be extracted via flash loan before `sync()` is called - this is accepted behavior
+
 ### Real Issues - Tracked as GitHub Issues
 
-| Finding | Severity | Issue |
-|---------|----------|-------|
-| #2/#3: Excess USDC extraction | Medium | [#18](https://github.com/igor53627/liq/issues/18) |
-| #1: TestBorrower lender injection | High (example code) | [#19](https://github.com/igor53627/liq/issues/19) |
-| #8: Missing ERC20 return value checks | Info | [#20](https://github.com/igor53627/liq/issues/20) |
-| #13/#14: Missing events | Best Practices | [#21](https://github.com/igor53627/liq/issues/21) |
+| Finding | Severity | Issue | Status |
+|---------|----------|-------|--------|
+| #1: TestBorrower lender injection | High (example code) | [#19](https://github.com/igor53627/liq/issues/19) | Fixed in this PR |
+| #8: Missing ERC20 return value checks | Info | [#20](https://github.com/igor53627/liq/issues/20) | Open |
+| #13/#14: Missing events | Best Practices | [#21](https://github.com/igor53627/liq/issues/21) | Open |
