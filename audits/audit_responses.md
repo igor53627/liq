@@ -60,13 +60,13 @@ This document tracks responses to audit findings that are either false positives
 
 ### Out of Scope (Example/Test Code)
 
-**Finding #1: TestBorrower arbitrary lender injection** - TRACKED AS ISSUE #19
+**Finding #1: TestBorrower arbitrary lender injection** - FIXED AND DEPLOYED
 - Real vulnerability but in example/test contract, not production code
-- Created issue to harden the example for safety of integrators who may copy it
+- Fixed in PR #22 with validation checks (expectedLender, initiator, token, amount)
+- Redeployed to mainnet: [0x7e13a21ce933a7122a8d1bdf0aeced4ba48ecad6](https://etherscan.io/address/0x7e13a21ce933a7122a8d1bdf0aeced4ba48ecad6)
 
-**Finding #7: Unsafe ERC20 Operation Usage (TestBorrower)** - OUT OF SCOPE
-- TestBorrower is example code, not production
-- Would be fixed as part of Issue #19
+**Finding #7: Unsafe ERC20 Operation Usage (TestBorrower)** - FIXED
+- Fixed as part of Issue #19 - now checks transfer return value
 
 ### Acknowledged Design Decisions (Additional)
 
@@ -82,6 +82,6 @@ This document tracks responses to audit findings that are either false positives
 | Finding | Severity | Issue | Status |
 |---------|----------|-------|--------|
 | #2/#3: Excess USDC extraction | Medium | [#18](https://github.com/igor53627/liq/issues/18) | Closed - Design decision |
-| #1: TestBorrower lender injection | High (example code) | [#19](https://github.com/igor53627/liq/issues/19) | Fixed in PR #22 |
+| #1: TestBorrower lender injection | High (example code) | [#19](https://github.com/igor53627/liq/issues/19) | Fixed in PR #22, deployed to mainnet |
 | #8: Missing ERC20 return value checks | Info | [#20](https://github.com/igor53627/liq/issues/20) | Closed - Future version |
 | #13/#14: Missing events | Best Practices | [#21](https://github.com/igor53627/liq/issues/21) | Closed - Gas optimization |
