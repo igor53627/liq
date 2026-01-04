@@ -42,13 +42,10 @@ contract TestBorrower {
         expectedAmount = 0;
     }
 
-    function onFlashLoan(
-        address initiator,
-        address token,
-        uint256 amount,
-        uint256,
-        bytes calldata
-    ) external returns (bytes32) {
+    function onFlashLoan(address initiator, address token, uint256 amount, uint256, bytes calldata)
+        external
+        returns (bytes32)
+    {
         require(msg.sender == expectedLender, "unauthorized callback");
         require(initiator == address(this), "invalid initiator");
         require(token == USDC, "invalid token");
