@@ -277,23 +277,61 @@
             margin-bottom: 4px;
         }
 
-        .tooltip:hover::after {
+        .tooltip:hover::after,
+        .tooltip:focus::after,
+        .tooltip:focus-visible::after {
             opacity: 1;
             visibility: visible;
         }
 
-        .help-icon {
-            display: inline-block;
-            width: 14px;
-            height: 14px;
-            line-height: 14px;
-            text-align: center;
-            font-size: 0.65rem;
+        .help-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            font-size: 0.7rem;
             background: var(--bg-secondary);
+            border: 1px solid var(--text-secondary);
             border-radius: 50%;
             color: var(--text-secondary);
             margin-left: 4px;
             cursor: help;
+            padding: 0;
+            font-family: inherit;
+        }
+
+        .help-btn:focus-visible {
+            outline: 2px solid var(--accent-cyan);
+            outline-offset: 2px;
+        }
+
+        .skip-link {
+            position: absolute;
+            top: -40px;
+            left: 0;
+            background: var(--accent-cyan);
+            color: var(--bg-primary);
+            padding: 8px 16px;
+            z-index: 1000;
+            text-decoration: none;
+            border-radius: 0 0 8px 0;
+        }
+
+        .skip-link:focus {
+            top: 0;
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
         }
 
         .warning-box {
@@ -369,102 +407,111 @@
     </style>
 </head>
 <body>
+    <a href="#main" class="skip-link">Skip to main content</a>
     <div class="container">
         <header>
-            <div class="logo">LIQ Flash Loan</div>
+            <h1 class="logo">LIQ Flash Loan</h1>
             <button id="connectBtn" class="btn btn-connect">Connect Wallet</button>
         </header>
+        <main id="main">
 
         <!-- Status Panel -->
-        <div class="panel">
-            <div class="panel-title">
-                <span class="status-dot loading" id="statusDot"></span>
+        <section class="panel" aria-labelledby="status-heading">
+            <h2 class="panel-title" id="status-heading">
+                <span class="status-dot loading" id="statusDot" aria-hidden="true"></span>
                 Pool Status
-            </div>
+                <span class="sr-only" id="statusAnnounce" aria-live="polite"></span>
+            </h2>
             <div class="stats-grid">
                 <div class="stat">
-                    <div class="stat-label">Pool Balance (tracked)</div>
-                    <div class="stat-value" id="poolBalance">-</div>
+                    <div class="stat-label" id="poolBalanceLabel">Pool Balance (tracked)</div>
+                    <div class="stat-value" id="poolBalance" aria-labelledby="poolBalanceLabel">-</div>
                 </div>
                 <div class="stat">
-                    <div class="stat-label">Actual USDC Balance</div>
-                    <div class="stat-value" id="actualBalance">-</div>
+                    <div class="stat-label" id="actualBalanceLabel">Actual USDC Balance</div>
+                    <div class="stat-value" id="actualBalance" aria-labelledby="actualBalanceLabel">-</div>
                 </div>
                 <div class="stat">
-                    <div class="stat-label">
+                    <div class="stat-label" id="syncStatusLabel">
                         Sync Status
-                        <span class="help-icon tooltip" data-tooltip="Synced = poolBalance matches actual USDC balance">?</span>
+                        <button type="button" class="help-btn tooltip" data-tooltip="Synced = poolBalance matches actual USDC balance" aria-label="Help: Synced means poolBalance matches actual USDC balance">?</button>
                     </div>
-                    <div class="stat-value" id="syncStatus">-</div>
+                    <div class="stat-value" id="syncStatus" aria-labelledby="syncStatusLabel">-</div>
                 </div>
                 <div class="stat">
-                    <div class="stat-label">Owner</div>
-                    <div class="stat-value" id="ownerAddress">-</div>
+                    <div class="stat-label" id="ownerLabel">Owner</div>
+                    <div class="stat-value" id="ownerAddress" aria-labelledby="ownerLabel">-</div>
                 </div>
             </div>
             <div class="contract-info">
-                Contract: <a href="https://etherscan.io/address/0xe9eb8a0f6328e243086fe6efee0857e14fa2cb87" target="_blank" id="contractLink">0xe9eb8a0f6328e243086fe6efee0857e14fa2cb87</a>
+                Contract: <a href="https://etherscan.io/address/0xe9eb8a0f6328e243086fe6efee0857e14fa2cb87" target="_blank" rel="noopener noreferrer" id="contractLink">0xe9eb8a0f6328e243086fe6efee0857e14fa2cb87 <span class="sr-only">(opens in new tab)</span></a>
             </div>
-        </div>
+        </section>
 
         <!-- Warning Box (shown when unsynced) -->
-        <div class="warning-box hidden" id="warningBox">
-            [!] Excess USDC detected. Call sync() to protect it from being drained.
+        <div class="warning-box hidden" id="warningBox" role="alert" aria-live="assertive">
+            Warning: Excess USDC detected. Call sync() to protect it from being drained.
         </div>
 
         <!-- Actions Panel -->
-        <div class="panel">
-            <div class="panel-title">Actions</div>
-            <div class="actions-row">
-                <button class="action-btn" id="syncAction" data-action="sync">
-                    <div class="action-icon">[S]</div>
+        <section class="panel" aria-labelledby="actions-heading">
+            <h2 class="panel-title" id="actions-heading">Actions</h2>
+            <div class="actions-row" role="tablist" aria-label="Action selection">
+                <button class="action-btn" id="syncAction" data-action="sync" role="tab" aria-selected="false" aria-controls="syncPanel">
+                    <div class="action-icon" aria-hidden="true">[S]</div>
                     <div>Sync</div>
                 </button>
-                <button class="action-btn" id="depositAction" data-action="deposit">
-                    <div class="action-icon">[+]</div>
+                <button class="action-btn" id="depositAction" data-action="deposit" role="tab" aria-selected="false" aria-controls="depositPanel">
+                    <div class="action-icon" aria-hidden="true">[+]</div>
                     <div>Deposit</div>
                 </button>
-                <button class="action-btn" id="withdrawAction" data-action="withdraw">
-                    <div class="action-icon">[-]</div>
+                <button class="action-btn" id="withdrawAction" data-action="withdraw" role="tab" aria-selected="false" aria-controls="withdrawPanel">
+                    <div class="action-icon" aria-hidden="true">[-]</div>
                     <div>Withdraw</div>
                 </button>
             </div>
-        </div>
+        </section>
 
         <!-- Action Forms -->
-        <div class="panel hidden" id="syncPanel">
-            <div class="panel-title">Sync Pool Balance</div>
+        <section class="panel hidden" id="syncPanel" role="tabpanel" aria-labelledby="syncAction">
+            <h2 class="panel-title">Sync Pool Balance</h2>
             <p style="color: var(--text-secondary); margin-bottom: 1rem; font-size: 0.9rem;">
                 Sets poolBalance = USDC.balanceOf(this). Call after any direct USDC transfers.
             </p>
             <button class="btn btn-primary" id="syncBtn">Sync Now</button>
-        </div>
+        </section>
 
-        <div class="panel hidden" id="depositPanel">
-            <div class="panel-title">Deposit USDC</div>
+        <section class="panel hidden" id="depositPanel" role="tabpanel" aria-labelledby="depositAction">
+            <h2 class="panel-title">Deposit USDC</h2>
             <div class="input-group">
-                <label>Amount (USDC)</label>
-                <input type="number" id="depositAmount" placeholder="1000.00" step="0.01">
+                <label for="depositAmount">Amount (USDC)</label>
+                <input type="number" id="depositAmount" placeholder="1000.00" step="0.01" aria-describedby="depositHelp">
+                <span id="depositHelp" class="sr-only">Enter the amount of USDC you want to deposit</span>
             </div>
             <button class="btn btn-primary" id="depositBtn">Approve & Deposit</button>
-        </div>
+        </section>
 
-        <div class="panel hidden" id="withdrawPanel">
-            <div class="panel-title">Withdraw USDC</div>
+        <section class="panel hidden" id="withdrawPanel" role="tabpanel" aria-labelledby="withdrawAction">
+            <h2 class="panel-title">Withdraw USDC</h2>
             <div class="input-group">
-                <label>Amount (USDC)</label>
-                <input type="number" id="withdrawAmount" placeholder="1000.00" step="0.01">
+                <label for="withdrawAmount">Amount (USDC)</label>
+                <input type="number" id="withdrawAmount" placeholder="1000.00" step="0.01" aria-describedby="withdrawHelp">
+                <span id="withdrawHelp" class="sr-only">Enter the amount of USDC you want to withdraw</span>
             </div>
             <button class="btn btn-primary" id="withdrawBtn">Withdraw</button>
-        </div>
+        </section>
 
         <!-- Activity Log -->
-        <div class="panel">
-            <div class="panel-title">Activity Log</div>
-            <div class="log" id="log">
+        <section class="panel" aria-labelledby="log-heading">
+            <h2 class="panel-title" id="log-heading">Activity Log</h2>
+            <div class="log" id="log" role="log" aria-live="polite" aria-relevant="additions">
                 <div class="log-entry log-info">Welcome to LIQ Flash Loan Dashboard</div>
             </div>
-        </div>
+        </section>
+
+        <!-- Screen reader announcements -->
+        <div id="srAnnounce" class="sr-only" aria-live="assertive" aria-atomic="true"></div>
+        </main>
     </div>
 
     <script type="module">
@@ -709,12 +756,26 @@
 
         actionBtns.forEach(btn => {
             btn.addEventListener('click', () => {
-                actionBtns.forEach(b => b.classList.remove('active'));
+                // Update visual state
+                actionBtns.forEach(b => {
+                    b.classList.remove('active');
+                    b.setAttribute('aria-selected', 'false');
+                });
                 btn.classList.add('active');
+                btn.setAttribute('aria-selected', 'true');
+                
+                // Show/hide panels
                 const action = btn.dataset.action;
                 syncPanel.classList.toggle('hidden', action !== 'sync');
                 depositPanel.classList.toggle('hidden', action !== 'deposit');
                 withdrawPanel.classList.toggle('hidden', action !== 'withdraw');
+                
+                // Focus the first focusable element in the panel
+                const activePanel = document.getElementById(action + 'Panel');
+                if (activePanel) {
+                    const focusable = activePanel.querySelector('input, button');
+                    if (focusable) focusable.focus();
+                }
             });
         });
 
