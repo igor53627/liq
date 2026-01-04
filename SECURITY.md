@@ -66,7 +66,7 @@ Report vulnerabilities to: security@liq.protocol
 
 The owner can:
 - Withdraw all USDC via `withdraw()`
-- Rescue ETH via `rescueETH()`
+- Sync pool balance via `sync()`
 - Transfer ownership
 
 **Risk**: Centralization. Owner could rug depositors.

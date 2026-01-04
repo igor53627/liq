@@ -8,7 +8,16 @@
     "test": "test"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "forge test -vvv",
+    "test:fork": "forge test --fork-url https://ethereum-rpc.publicnode.com -vvv",
+    "build": "forge build",
+    "fmt": "forge fmt",
+    "fmt:check": "forge fmt --check",
+    "deploy": "npx tsx script/deploy.ts",
+    "deploy:dry": "npx tsx script/deploy.ts --dry-run",
+    "arb:scan": "npx tsx script/arb-scanner.ts",
+    "arb:watch": "npx tsx script/arb-scanner.ts --watch",
+    "flashloan:test": "npx tsx script/test-flashloan.ts"
   },
   "keywords": [],
   "author": "",

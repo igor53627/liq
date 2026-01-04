@@ -475,6 +475,7 @@
         const LIQ_ADDRESS = '0xe9eb8a0f6328e243086fe6efee0857e14fa2cb87';
         const USDC_ADDRESS = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48';
         const PUBLIC_RPC = 'https://ethereum-rpc.publicnode.com';
+        const MAINNET_CHAIN_ID = 1;
 
         // ABIs
         const LIQ_ABI = [
@@ -516,7 +517,11 @@
             const time = new Date().toLocaleTimeString();
             const entry = document.createElement('div');
             entry.className = `log-entry log-${type}`;
-            entry.innerHTML = `<span class="log-time">[${time}]</span> ${message}`;
+            const timeSpan = document.createElement('span');
+            timeSpan.className = 'log-time';
+            timeSpan.textContent = `[${time}]`;
+            entry.appendChild(timeSpan);
+            entry.appendChild(document.createTextNode(' ' + message));
             logEl.appendChild(entry);
             logEl.scrollTop = logEl.scrollHeight;
         }
@@ -548,6 +553,29 @@
             }
 
             try {
+                const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' });
+                const chainId = parseInt(chainIdHex, 16);
+                if (chainId !== MAINNET_CHAIN_ID) {
+                    log(`Wrong network (chain ${chainId}). Please switch to Ethereum Mainnet.`, 'error');
+                    try {
+                        await window.ethereum.request({
+                            method: 'wallet_switchEthereumChain',
+                            params: [{ chainId: '0x1' }],
+                        });
+                        // Re-verify the chain ID after switch
+                        const newChainIdHex = await window.ethereum.request({ method: 'eth_chainId' });
+                        const newChainId = parseInt(newChainIdHex, 16);
+                        if (newChainId !== MAINNET_CHAIN_ID) {
+                            log('Still on wrong network after switch attempt', 'error');
+                            return;
+                        }
+                        log('Successfully switched to Ethereum Mainnet', 'success');
+                    } catch (switchErr) {
+                        log('Failed to switch network', 'error');
+                        return;
+                    }
+                }
+
                 const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
                 userAddress = accounts[0];
 

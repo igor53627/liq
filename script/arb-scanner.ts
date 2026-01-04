@@ -25,7 +25,7 @@ const WATCH_MODE = process.argv.includes("--watch");
 const USDC = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48" as Address;
 const WETH = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2" as Address;
 const USDT = "0xdAC17F958D2ee523a2206206994597C13D831ec7" as Address;
-const DAI = "0x6B175474E89094C44Da98b954EedcdeCB5a6F04" as Address;
+const DAI = "0x6B175474E89094C44Da98b954EedeAC495271d0F" as Address;
 const WBTC = "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599" as Address;
 
 // DEX Routers/Factories

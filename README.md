@@ -1,6 +1,18 @@
 # LIQ Flash Loans
 
+[![CI](https://github.com/igor53627/liq/actions/workflows/ci.yml/badge.svg)](https://github.com/igor53627/liq/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Deployed on Ethereum](https://img.shields.io/badge/Deployed-Ethereum%20Mainnet-blue)](https://etherscan.io/address/0xe9eb8a0f6328e243086fe6efee0857e14fa2cb87)
+
 **Zero-fee, gas-optimized USDC flash loans for arbitrage and liquidation bots.**
+
+## Quick Links
+
+| Resource | Link |
+|----------|------|
+| Contract | [`0xe9eb8a0f6328e243086fe6efee0857e14fa2cb87`](https://etherscan.io/address/0xe9eb8a0f6328e243086fe6efee0857e14fa2cb87) |
+| Gas Analysis | [research/BALANCER_COMPARISON.md](research/BALANCER_COMPARISON.md) |
+| Security Policy | [SECURITY.md](SECURITY.md) |
 
 ## Gas Comparison
 
@@ -105,7 +117,6 @@ interface ILIQFlash {
 ### What's NOT checked
 
 - Callback return value (balance check is sufficient security)
-- Token parameter (always USDC)
 
 ## Mainnet Deployment
 
@@ -172,6 +183,28 @@ The ~40k is mostly USDC proxy overhead - unavoidable without a different token.
 | Morpho (approve + transferFrom) | ~23k | ~6k | ~29k |
 
 LIQ's `transfer()` + `balanceOf()` pattern is **~5x more efficient** for repayment than the `approve()` + `transferFrom()` pattern used by Morpho.
+
+## FAQ
+
+**Why USDC only?**
+
+Single-token focus enables maximum gas optimization. Supporting multiple tokens would require additional storage reads and conditional logic, increasing gas costs. USDC is the most liquid stablecoin for arbitrage and liquidation use cases.
+
+**Why Pure Yul?**
+
+Yul (inline assembly) eliminates Solidity's safety checks and ABI encoding overhead. For a simple flash loan contract, these checks are redundant - the balance verification after callback is the only security that matters.
+
+**Why not check the callback return value?**
+
+ERC-3156 specifies that borrowers should return `keccak256("ERC3156FlashBorrower.onFlashLoan")`. However, checking this adds gas and provides no additional security - if the borrower doesn't repay, the transaction reverts anyway due to the balance check. The return value check is security theater.
+
+**What happens if someone sends USDC directly to the contract?**
+
+Direct transfers increase the actual balance but not `poolBalance`. This excess USDC cannot be borrowed (flash loans are capped at `poolBalance`). The owner can call `sync()` to update `poolBalance` to match the actual balance, making the excess available for flash loans.
+
+## Security
+
+For security concerns, vulnerability reports, or questions about the security model, see [SECURITY.md](SECURITY.md).
 
 ## License
 
